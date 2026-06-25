@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useState } from 'react'
+import { TrendingUp, User, Mail, Lock, AlertCircle } from 'lucide-react'
 
 const schema = z.object({
   full_name: z.string().min(2, 'Full name must be at least 2 characters'),
@@ -15,6 +16,8 @@ const schema = z.object({
   path: ['confirm'],
 })
 type FormData = z.infer<typeof schema>
+
+const inputClass = "w-full rounded-xl border border-white/8 bg-white/5 py-2.5 pl-9 pr-3 text-sm text-gray-100 placeholder-gray-600 transition focus:border-violet-500/60 focus:bg-white/7 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -29,90 +32,90 @@ export default function RegisterPage() {
     const { error: signUpError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: {
-        data: { full_name: data.full_name },
-      },
+      options: { data: { full_name: data.full_name } },
     })
     if (signUpError) { setError(signUpError.message); return }
     navigate('/pending')
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-[#0f0f0f] px-4 py-8">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-violet-400">ZScope</h1>
-          <p className="mt-1 text-sm text-gray-500">Cash Flow Monitoring System</p>
+    <div className="relative flex min-h-full items-center justify-center bg-[#0a0a0a] px-4 py-8 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="h-[500px] w-[500px] rounded-full bg-violet-600/10 blur-[120px]" />
+      </div>
+
+      <div className="relative w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-600 shadow-lg shadow-violet-600/30">
+            <TrendingUp size={28} className="text-white" />
+          </div>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-white">ZScope</h1>
+            <p className="mt-0.5 text-sm text-gray-500">Cash Flow Monitoring System</p>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-gray-800 bg-[#141414] p-6">
-          <h2 className="text-lg font-semibold text-gray-100">Create account</h2>
+        <div className="rounded-2xl border border-white/8 bg-white/4 p-6 shadow-2xl backdrop-blur-sm">
+          <h2 className="mb-5 text-base font-semibold text-white">Create your account</h2>
 
           {error && (
-            <p className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">{error}</p>
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/8 px-3.5 py-3">
+              <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" />
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
           )}
 
-          <div>
-            <label className="mb-1 block text-sm text-gray-400">Full name</label>
-            <input
-              {...register('full_name')}
-              type="text"
-              autoComplete="name"
-              className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none"
-              placeholder="Juan dela Cruz"
-            />
-            {errors.full_name && <p className="mt-1 text-xs text-red-400">{errors.full_name.message}</p>}
-          </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-400">Full name</label>
+              <div className="relative">
+                <User size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input {...register('full_name')} type="text" autoComplete="name" className={inputClass} placeholder="Juan dela Cruz" />
+              </div>
+              {errors.full_name && <p className="mt-1.5 text-xs text-red-400">{errors.full_name.message}</p>}
+            </div>
 
-          <div>
-            <label className="mb-1 block text-sm text-gray-400">Email</label>
-            <input
-              {...register('email')}
-              type="email"
-              autoComplete="email"
-              className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none"
-              placeholder="you@example.com"
-            />
-            {errors.email && <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>}
-          </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-400">Email address</label>
+              <div className="relative">
+                <Mail size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input {...register('email')} type="email" autoComplete="email" className={inputClass} placeholder="you@example.com" />
+              </div>
+              {errors.email && <p className="mt-1.5 text-xs text-red-400">{errors.email.message}</p>}
+            </div>
 
-          <div>
-            <label className="mb-1 block text-sm text-gray-400">Password</label>
-            <input
-              {...register('password')}
-              type="password"
-              autoComplete="new-password"
-              className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none"
-              placeholder="••••••••"
-            />
-            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
-          </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-400">Password</label>
+              <div className="relative">
+                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input {...register('password')} type="password" autoComplete="new-password" className={inputClass} placeholder="••••••••" />
+              </div>
+              {errors.password && <p className="mt-1.5 text-xs text-red-400">{errors.password.message}</p>}
+            </div>
 
-          <div>
-            <label className="mb-1 block text-sm text-gray-400">Confirm password</label>
-            <input
-              {...register('confirm')}
-              type="password"
-              autoComplete="new-password"
-              className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none"
-              placeholder="••••••••"
-            />
-            {errors.confirm && <p className="mt-1 text-xs text-red-400">{errors.confirm.message}</p>}
-          </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-400">Confirm password</label>
+              <div className="relative">
+                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input {...register('confirm')} type="password" autoComplete="new-password" className={inputClass} placeholder="••••••••" />
+              </div>
+              {errors.confirm && <p className="mt-1.5 text-xs text-red-400">{errors.confirm.message}</p>}
+            </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50 transition-colors"
-          >
-            {isSubmitting ? 'Creating account…' : 'Create account'}
-          </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="mt-1 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500 active:scale-[0.98] disabled:opacity-50"
+            >
+              {isSubmitting ? 'Creating account…' : 'Create account'}
+            </button>
+          </form>
 
-          <p className="text-center text-sm text-gray-500">
+          <p className="mt-4 text-center text-sm text-gray-500">
             Already registered?{' '}
-            <Link to="/login" className="text-violet-400 hover:text-violet-300">Sign in</Link>
+            <Link to="/login" className="font-medium text-violet-400 hover:text-violet-300 transition-colors">Sign in</Link>
           </p>
-        </form>
+        </div>
       </div>
     </div>
   )
