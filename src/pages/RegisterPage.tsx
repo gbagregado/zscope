@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useState } from 'react'
-import { TrendingUp, User, Mail, Lock, AlertCircle } from 'lucide-react'
+import { TrendingUp, AlertCircle, ShieldCheck, BarChart3, Wallet } from 'lucide-react'
 
 const schema = z.object({
   full_name: z.string().min(2, 'Full name must be at least 2 characters'),
@@ -17,7 +17,7 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
-const inputClass = "w-full rounded-xl border border-white/8 bg-white/5 py-2.5 pl-9 pr-3 text-sm text-gray-100 placeholder-gray-600 transition focus:border-violet-500/60 focus:bg-white/7 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+const inputClass = "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-violet-500 focus:bg-white/[0.05] focus:ring-4 focus:ring-violet-500/10"
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -39,81 +39,114 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="relative flex min-h-full items-center justify-center bg-[#0a0a0a] px-4 py-8 overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="h-[500px] w-[500px] rounded-full bg-violet-600/10 blur-[120px]" />
-      </div>
+    <div className="flex min-h-screen bg-[#0a0a0f]">
+      {/* Left brand panel — desktop only */}
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-violet-700 via-violet-800 to-indigo-950 p-12 lg:flex">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-violet-500/30 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 -left-20 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
 
-      <div className="relative w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-600 shadow-lg shadow-violet-600/30">
-            <TrendingUp size={28} className="text-white" />
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm ring-1 ring-white/20">
+            <TrendingUp size={22} className="text-white" />
           </div>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-white">ZScope</h1>
-            <p className="mt-0.5 text-sm text-gray-500">Cash Flow Monitoring System</p>
+          <span className="text-xl font-bold tracking-tight text-white">ZScope</span>
+        </div>
+
+        <div className="relative max-w-md">
+          <h2 className="text-4xl font-bold leading-tight tracking-tight text-white">
+            Join ZScope today.
+          </h2>
+          <p className="mt-4 text-base leading-relaxed text-violet-200/80">
+            Create your account to start tracking your cash flow with confidence and complete transparency.
+          </p>
+
+          <div className="mt-10 flex flex-col gap-5">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15">
+                <BarChart3 size={17} className="text-white" />
+              </div>
+              <span className="text-sm text-violet-100/90">Live balance & transaction history</span>
+            </div>
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15">
+                <Wallet size={17} className="text-white" />
+              </div>
+              <span className="text-sm text-violet-100/90">Seamless add funds & withdrawals</span>
+            </div>
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15">
+                <ShieldCheck size={17} className="text-white" />
+              </div>
+              <span className="text-sm text-violet-100/90">Bank-grade security & admin approval</span>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/8 bg-white/4 p-6 shadow-2xl backdrop-blur-sm">
-          <h2 className="mb-5 text-base font-semibold text-white">Create your account</h2>
+        <p className="relative text-xs text-violet-300/60">
+          © {new Date().getFullYear()} ZScope. All rights reserved.
+        </p>
+      </div>
+
+      {/* Right form panel */}
+      <div className="flex w-full flex-col items-center justify-center px-6 py-12 lg:w-1/2">
+        <div className="w-full max-w-sm">
+          {/* Mobile logo */}
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-600 shadow-lg shadow-violet-600/30">
+              <TrendingUp size={22} className="text-white" />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-white">ZScope</span>
+          </div>
+
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold tracking-tight text-white">Create your account</h1>
+            <p className="mt-2 text-sm text-gray-400">Get started in just a few seconds</p>
+          </div>
 
           {error && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/8 px-3.5 py-3">
-              <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" />
-              <p className="text-sm text-red-400">{error}</p>
+            <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
+              <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-400" />
+              <p className="text-sm text-red-300">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-400">Full name</label>
-              <div className="relative">
-                <User size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input {...register('full_name')} type="text" autoComplete="name" className={inputClass} placeholder="Juan dela Cruz" />
-              </div>
-              {errors.full_name && <p className="mt-1.5 text-xs text-red-400">{errors.full_name.message}</p>}
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">Full name</label>
+              <input {...register('full_name')} type="text" autoComplete="name" className={inputClass} placeholder="Juan dela Cruz" />
+              {errors.full_name && <p className="text-xs text-red-400">{errors.full_name.message}</p>}
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-400">Email address</label>
-              <div className="relative">
-                <Mail size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input {...register('email')} type="email" autoComplete="email" className={inputClass} placeholder="you@example.com" />
-              </div>
-              {errors.email && <p className="mt-1.5 text-xs text-red-400">{errors.email.message}</p>}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">Email address</label>
+              <input {...register('email')} type="email" autoComplete="email" className={inputClass} placeholder="you@example.com" />
+              {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-400">Password</label>
-              <div className="relative">
-                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input {...register('password')} type="password" autoComplete="new-password" className={inputClass} placeholder="••••••••" />
-              </div>
-              {errors.password && <p className="mt-1.5 text-xs text-red-400">{errors.password.message}</p>}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">Password</label>
+              <input {...register('password')} type="password" autoComplete="new-password" className={inputClass} placeholder="At least 6 characters" />
+              {errors.password && <p className="text-xs text-red-400">{errors.password.message}</p>}
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-400">Confirm password</label>
-              <div className="relative">
-                <Lock size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input {...register('confirm')} type="password" autoComplete="new-password" className={inputClass} placeholder="••••••••" />
-              </div>
-              {errors.confirm && <p className="mt-1.5 text-xs text-red-400">{errors.confirm.message}</p>}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">Confirm password</label>
+              <input {...register('confirm')} type="password" autoComplete="new-password" className={inputClass} placeholder="Re-enter your password" />
+              {errors.confirm && <p className="text-xs text-red-400">{errors.confirm.message}</p>}
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-1 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500 active:scale-[0.98] disabled:opacity-50"
+              className="mt-1 w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? 'Creating account…' : 'Create account'}
             </button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-gray-500">
-            Already registered?{' '}
-            <Link to="/login" className="font-medium text-violet-400 hover:text-violet-300 transition-colors">Sign in</Link>
+          <p className="mt-8 text-center text-sm text-gray-400">
+            Already have an account?{' '}
+            <Link to="/login" className="font-semibold text-violet-400 transition-colors hover:text-violet-300">Sign in</Link>
           </p>
         </div>
       </div>
