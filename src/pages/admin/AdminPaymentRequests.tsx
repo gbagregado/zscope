@@ -20,7 +20,7 @@ export default function AdminPaymentRequests() {
     queryFn: async (): Promise<PaymentRow[]> => {
       const { data, error } = await supabase
         .from('payment_requests')
-        .select('*, member:profiles(full_name, email)')
+        .select('*, member:profiles!member_id(full_name, email)')
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as PaymentRow[]

@@ -22,7 +22,7 @@ export default function AdminWithdrawalRequests() {
     queryFn: async (): Promise<WithdrawalRow[]> => {
       const { data, error } = await supabase
         .from('withdrawal_requests')
-        .select('*, member:profiles(full_name, email)')
+        .select('*, member:profiles!member_id(full_name, email)')
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as WithdrawalRow[]
