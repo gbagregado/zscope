@@ -20,6 +20,7 @@ export default function AdminPaymentMethods() {
   const [showForm, setShowForm] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [qrFile, setQrFile] = useState<File | null>(null)
+  const [saveError, setSaveError] = useState('')
 
   const { data: methods, isLoading } = useQuery({
     queryKey: ['payment-methods-admin'],
@@ -39,7 +40,8 @@ export default function AdminPaymentMethods() {
       const { error } = await supabase.from('payment_methods').insert(data)
       if (error) throw error
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['payment-methods-admin'] }); reset(); setShowForm(false); setQrFile(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['payment-methods-admin'] }); reset(); setShowForm(false); setQrFile(null); setSaveError('') },
+    onError: (e: unknown) => setSaveError(e instanceof Error ? e.message : 'Failed to save payment method'),
   })
 
   const toggleMethod = useMutation({
@@ -59,6 +61,7 @@ export default function AdminPaymentMethods() {
   })
 
   async function onSubmit(data: FormData) {
+    setSaveError('')
     let qr_image_url: string | undefined
     if (qrFile) {
       setUploading(true)
@@ -66,7 +69,10 @@ export default function AdminPaymentMethods() {
       const path = `${Date.now()}.${ext}`
       const { error: uploadError } = await supabase.storage.from('qr-codes').upload(path, qrFile)
       setUploading(false)
-      if (uploadError) return
+      if (uploadError) {
+        setSaveError(`QR upload failed: ${uploadError.message}. Make sure storage policies are applied.`)
+        return
+      }
       const { data: urlData } = supabase.storage.from('qr-codes').getPublicUrl(path)
       qr_image_url = urlData.publicUrl
     }
@@ -90,6 +96,9 @@ export default function AdminPaymentMethods() {
       {showForm && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 rounded-xl border border-gray-800 bg-[#141414] p-4">
           <h2 className="text-sm font-medium text-gray-300">New Payment Method</h2>
+          {saveError && (
+            <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">{saveError}</div>
+          )}
           {['name', 'account_name', 'account_number'].map((field) => (
             <div key={field}>
               <label className="mb-1 block text-xs text-gray-500 capitalize">{field.replace('_', ' ')}</label>
