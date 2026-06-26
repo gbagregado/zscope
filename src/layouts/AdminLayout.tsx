@@ -6,6 +6,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Megaphone,
+  Image,
   LogOut,
   TrendingUp,
 } from 'lucide-react'
@@ -17,6 +18,7 @@ const nav = [
   { to: '/admin/payment-requests', label: 'Add Funds', icon: ArrowDownCircle },
   { to: '/admin/withdrawal-requests', label: 'Withdrawals', icon: ArrowUpCircle },
   { to: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+  { to: '/admin/advertisements', label: 'Advertisements', icon: Image },
 ]
 
 const pageTitles: Record<string, string> = {
@@ -25,6 +27,7 @@ const pageTitles: Record<string, string> = {
   '/admin/payment-requests': 'Add Funds Requests',
   '/admin/withdrawal-requests': 'Withdrawal Requests',
   '/admin/announcements': 'Announcements',
+  '/admin/advertisements': 'Advertisements',
 }
 
 export default function AdminLayout() {

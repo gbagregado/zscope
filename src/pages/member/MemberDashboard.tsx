@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { TrendingUp, TrendingDown, Wallet } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import AdCarousel from '../../components/AdCarousel'
 
 export default function MemberDashboard() {
   const { profile } = useAuthStore()
@@ -79,6 +80,9 @@ export default function MemberDashboard() {
           <TrendingDown size={16} /> Withdraw
         </Link>
       </div>
+
+      {/* Advertisements */}
+      <AdCarousel />
 
       {/* Recent transactions */}
       <div>

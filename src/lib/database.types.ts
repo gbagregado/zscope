@@ -124,6 +124,26 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['announcements']['Insert']>
         Relationships: []
       }
+      advertisements: {
+        Row: {
+          id: string
+          image_url: string
+          storage_path: string | null
+          sort_order: number
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          image_url: string
+          storage_path?: string | null
+          sort_order?: number
+          is_active?: boolean
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['advertisements']['Insert']>
+        Relationships: []
+      }
     }
     Views: {
       member_balances: {
