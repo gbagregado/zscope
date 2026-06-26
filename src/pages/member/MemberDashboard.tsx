@@ -97,17 +97,17 @@ export default function MemberDashboard() {
       </div>
 
       {/* Stat cards with trends */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         {/* Current Balance */}
-        <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-transparent p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/15 ring-1 ring-violet-500/20">
-              <Wallet size={18} className="text-violet-300" />
+        <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-transparent p-3 sm:rounded-2xl sm:p-5">
+          <div className="mb-2 flex items-center gap-2 sm:mb-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 ring-1 ring-violet-500/20 sm:h-9 sm:w-9">
+              <Wallet className="h-4 w-4 text-violet-300 sm:h-[18px] sm:w-[18px]" />
             </div>
-            <p className="text-sm text-violet-200/80">Current Balance</p>
+            <p className="text-xs text-violet-200/80 sm:text-sm">Current Balance</p>
           </div>
-          <p className="text-2xl font-bold text-white">{fmt(Number(balance?.balance ?? 0))}</p>
-          <div className="mt-2 flex items-center gap-1.5 text-xs">
+          <p className="text-lg font-bold text-white sm:text-2xl">{fmt(Number(balance?.balance ?? 0))}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[11px] sm:mt-2 sm:text-xs">
             <span className={netToday >= 0 ? 'flex items-center gap-0.5 font-medium text-green-400' : 'flex items-center gap-0.5 font-medium text-red-400'}>
               {netToday >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
               {netToday >= 0 ? '+' : '-'}{fmt(Math.abs(netToday))}
@@ -117,15 +117,15 @@ export default function MemberDashboard() {
         </div>
 
         {/* Total Credits */}
-        <div className="rounded-2xl border border-gray-800 bg-[#141414] p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-500/10 ring-1 ring-green-500/15">
-              <TrendingUp size={18} className="text-green-400" />
+        <div className="rounded-xl border border-gray-800 bg-[#141414] p-3 sm:rounded-2xl sm:p-5">
+          <div className="mb-2 flex items-center gap-2 sm:mb-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-green-500/10 ring-1 ring-green-500/15 sm:h-9 sm:w-9">
+              <TrendingUp className="h-4 w-4 text-green-400 sm:h-[18px] sm:w-[18px]" />
             </div>
-            <p className="text-sm text-gray-400">Total Credits</p>
+            <p className="text-xs text-gray-400 sm:text-sm">Total Credits</p>
           </div>
-          <p className="text-2xl font-bold text-white">{fmt(Number(balance?.total_credits ?? 0))}</p>
-          <div className="mt-2 flex items-center gap-1.5 text-xs">
+          <p className="text-lg font-bold text-white sm:text-2xl">{fmt(Number(balance?.total_credits ?? 0))}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[11px] sm:mt-2 sm:text-xs">
             <span className={(creditsTrend ?? 0) >= 0 ? 'flex items-center gap-0.5 font-medium text-green-400' : 'flex items-center gap-0.5 font-medium text-red-400'}>
               {(creditsTrend ?? 0) >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
               {fmtPct(creditsTrend)}
@@ -135,15 +135,15 @@ export default function MemberDashboard() {
         </div>
 
         {/* Total Debits */}
-        <div className="rounded-2xl border border-gray-800 bg-[#141414] p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10 ring-1 ring-red-500/15">
-              <TrendingDown size={18} className="text-red-400" />
+        <div className="rounded-xl border border-gray-800 bg-[#141414] p-3 sm:rounded-2xl sm:p-5">
+          <div className="mb-2 flex items-center gap-2 sm:mb-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-500/10 ring-1 ring-red-500/15 sm:h-9 sm:w-9">
+              <TrendingDown className="h-4 w-4 text-red-400 sm:h-[18px] sm:w-[18px]" />
             </div>
-            <p className="text-sm text-gray-400">Total Debits</p>
+            <p className="text-xs text-gray-400 sm:text-sm">Total Debits</p>
           </div>
-          <p className="text-2xl font-bold text-white">{fmt(Number(balance?.total_debits ?? 0))}</p>
-          <div className="mt-2 flex items-center gap-1.5 text-xs">
+          <p className="text-lg font-bold text-white sm:text-2xl">{fmt(Number(balance?.total_debits ?? 0))}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[11px] sm:mt-2 sm:text-xs">
             <span className={(debitsTrend ?? 0) <= 0 ? 'flex items-center gap-0.5 font-medium text-green-400' : 'flex items-center gap-0.5 font-medium text-red-400'}>
               {(debitsTrend ?? 0) <= 0 ? <ArrowDownRight size={13} /> : <ArrowUpRight size={13} />}
               {fmtPct(debitsTrend)}
@@ -153,17 +153,17 @@ export default function MemberDashboard() {
         </div>
 
         {/* Net This Month */}
-        <div className="rounded-2xl border border-gray-800 bg-[#141414] p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 ring-1 ring-violet-500/15">
-              <BarChart3 size={18} className="text-violet-400" />
+        <div className="rounded-xl border border-gray-800 bg-[#141414] p-3 sm:rounded-2xl sm:p-5">
+          <div className="mb-2 flex items-center gap-2 sm:mb-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 ring-1 ring-violet-500/15 sm:h-9 sm:w-9">
+              <BarChart3 className="h-4 w-4 text-violet-400 sm:h-[18px] sm:w-[18px]" />
             </div>
-            <p className="text-sm text-gray-400">Net This Month</p>
+            <p className="text-xs text-gray-400 sm:text-sm">Net This Month</p>
           </div>
-          <p className={netThisMonth >= 0 ? 'text-2xl font-bold text-green-400' : 'text-2xl font-bold text-red-400'}>
+          <p className={netThisMonth >= 0 ? 'text-lg font-bold text-green-400 sm:text-2xl' : 'text-lg font-bold text-red-400 sm:text-2xl'}>
             {netThisMonth >= 0 ? '+' : '-'}{fmt(Math.abs(netThisMonth))}
           </p>
-          <div className="mt-2 flex items-center gap-1.5 text-xs">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[11px] sm:mt-2 sm:text-xs">
             <span className={(netTrend ?? 0) >= 0 ? 'flex items-center gap-0.5 font-medium text-green-400' : 'flex items-center gap-0.5 font-medium text-red-400'}>
               {(netTrend ?? 0) >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
               {fmtPct(netTrend)}
