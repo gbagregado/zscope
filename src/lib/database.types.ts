@@ -117,10 +117,18 @@ export interface Database {
           id: string
           title: string
           body: string
+          image_url: string | null
+          storage_path: string | null
           created_by: string
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['announcements']['Row'], 'id' | 'created_at'>
+        Insert: {
+          title: string
+          body: string
+          image_url?: string | null
+          storage_path?: string | null
+          created_by: string
+        }
         Update: Partial<Database['public']['Tables']['announcements']['Insert']>
         Relationships: []
       }

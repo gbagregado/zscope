@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { useConfirm } from '../../components/ConfirmDialog'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Upload, Image as ImageIcon } from 'lucide-react'
 
 const schema = z.object({
   title: z.string().min(1, 'Required'),
@@ -19,6 +19,9 @@ export default function AdminAnnouncements() {
   const { profile } = useAuthStore()
   const confirm = useConfirm()
   const [showForm, setShowForm] = useState(false)
+  const [image, setImage] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
 
   const { data: items, isLoading } = useQuery({
     queryKey: ['announcements'],
@@ -34,20 +37,45 @@ export default function AdminAnnouncements() {
   })
 
   const add = useMutation({
-    mutationFn: async (data: FormData) => {
+    mutationFn: async (data: FormData & { image_url?: string | null; storage_path?: string | null }) => {
       const { error } = await supabase.from('announcements').insert({ ...data, created_by: profile!.id })
       if (error) throw error
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['announcements'] }); reset(); setShowForm(false) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['announcements'] }); reset(); setShowForm(false); setImage(null); setError('') },
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Failed to post announcement'),
   })
 
   const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('announcements').delete().eq('id', id)
+    mutationFn: async (item: { id: string; storage_path: string | null }) => {
+      if (item.storage_path) {
+        await supabase.storage.from('announcements').remove([item.storage_path])
+      }
+      const { error } = await supabase.from('announcements').delete().eq('id', item.id)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['announcements'] }),
   })
+
+  async function onSubmit(data: FormData) {
+    setError('')
+    let image_url: string | null = null
+    let storage_path: string | null = null
+    if (image) {
+      setUploading(true)
+      const ext = image.name.split('.').pop()
+      const path = `${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('announcements').upload(path, image)
+      setUploading(false)
+      if (upErr) {
+        setError(`Image upload failed: ${upErr.message}. Make sure the announcements storage policies are applied.`)
+        return
+      }
+      const { data: urlData } = supabase.storage.from('announcements').getPublicUrl(path)
+      image_url = urlData.publicUrl
+      storage_path = path
+    }
+    add.mutate({ ...data, image_url, storage_path })
+  }
 
   if (isLoading) return <div className="text-gray-500 text-sm">Loading…</div>
 
@@ -64,7 +92,10 @@ export default function AdminAnnouncements() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit((d) => add.mutate(d))} className="space-y-3 rounded-xl border border-gray-800 bg-[#141414] p-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 rounded-xl border border-gray-800 bg-[#141414] p-4">
+          {error && (
+            <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>
+          )}
           <div>
             <label className="mb-1 block text-xs text-gray-500">Title</label>
             <input {...register('title')} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
@@ -75,8 +106,25 @@ export default function AdminAnnouncements() {
             <textarea {...register('body')} rows={4} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none resize-none" />
             {errors.body && <p className="mt-1 text-xs text-red-400">{errors.body.message}</p>}
           </div>
-          <button type="submit" disabled={isSubmitting} className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white hover:bg-violet-500 disabled:opacity-50 transition-colors">
-            {isSubmitting ? 'Posting…' : 'Post'}
+          <div>
+            <label className="mb-1.5 block text-xs text-gray-500">Image <span className="text-gray-600">(optional)</span></label>
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-gray-700 bg-[#0f0f0f] p-3 transition hover:border-violet-500/60 hover:bg-violet-500/5">
+              {image ? (
+                <img src={URL.createObjectURL(image)} alt="preview" className="h-16 w-28 rounded-lg border border-gray-700 object-cover" />
+              ) : (
+                <div className="flex h-16 w-28 items-center justify-center rounded-lg border border-gray-700 bg-[#141414] text-gray-600">
+                  <ImageIcon size={22} />
+                </div>
+              )}
+              <div className="flex flex-1 items-center gap-2 text-sm text-gray-400">
+                <Upload size={15} />
+                <span>{image ? image.name : 'Click to attach an image'}</span>
+              </div>
+              <input type="file" accept="image/*" onChange={(e) => setImage(e.target.files?.[0] ?? null)} className="hidden" />
+            </label>
+          </div>
+          <button type="submit" disabled={isSubmitting || uploading} className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white hover:bg-violet-500 disabled:opacity-50 transition-colors">
+            {isSubmitting || uploading ? 'Posting…' : 'Post'}
           </button>
         </form>
       )}
@@ -85,9 +133,12 @@ export default function AdminAnnouncements() {
         {items?.map((a) => (
           <div key={a.id} className="rounded-xl border border-gray-800 bg-[#141414] p-4">
             <div className="flex items-start justify-between gap-2">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-200">{a.title}</p>
                 <p className="mt-1 text-sm text-gray-400">{a.body}</p>
+                {a.image_url && (
+                  <img src={a.image_url} alt={a.title} className="mt-3 max-h-48 w-full rounded-lg border border-gray-800 object-cover" />
+                )}
                 <p className="mt-2 text-xs text-gray-600">{new Date(a.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
               </div>
               <button
@@ -98,7 +149,7 @@ export default function AdminAnnouncements() {
                     confirmText: 'Delete',
                     tone: 'danger',
                   })
-                  if (ok) del.mutate(a.id)
+                  if (ok) del.mutate({ id: a.id, storage_path: a.storage_path })
                 }}
                 className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0"
               >

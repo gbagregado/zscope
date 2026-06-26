@@ -8,9 +8,9 @@ import {
   Megaphone,
   Image,
   LogOut,
-  TrendingUp,
 } from 'lucide-react'
 import clsx from 'clsx'
+import logo from '../assets/logo.jpeg'
 
 const nav = [
   { to: '/admin/members', label: 'Members', icon: Users },
@@ -47,10 +47,8 @@ export default function AdminLayout() {
       <aside className="hidden md:flex w-52 shrink-0 flex-col border-r border-white/6 bg-[#111111]">
         {/* Brand */}
         <div className="flex h-14 items-center gap-2.5 px-4 border-b border-white/6">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600">
-            <TrendingUp size={14} className="text-white" />
-          </div>
-          <span className="font-bold text-white tracking-tight">ZScope</span>
+          <img src={logo} alt="Z-Scope" className="h-7 w-7 rounded-lg object-cover" />
+          <span className="font-bold text-white tracking-tight">Z-Scope</span>
           <span className="ml-auto rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-400">
             ADMIN
           </span>

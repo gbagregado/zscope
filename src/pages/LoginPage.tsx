@@ -5,7 +5,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
 import { useState } from 'react'
-import { TrendingUp, AlertCircle, ShieldCheck, BarChart3, Wallet, Eye, EyeOff } from 'lucide-react'
+import { AlertCircle, ShieldCheck, BarChart3, Wallet, Eye, EyeOff } from 'lucide-react'
+import logo from '../assets/logo.jpeg'
 
 const schema = z.object({
   email: z.string().email('Invalid email'),
@@ -54,10 +55,8 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute -bottom-32 -left-20 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
 
         <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm ring-1 ring-white/20">
-            <TrendingUp size={22} className="text-white" />
-          </div>
-          <span className="text-xl font-bold tracking-tight text-white">ZScope</span>
+          <img src={logo} alt="Z-Scope" className="h-12 w-12 rounded-xl object-cover ring-1 ring-white/20" />
+          <span className="text-xl font-bold tracking-tight text-white">Z-Scope</span>
         </div>
 
         <div className="relative max-w-md">
@@ -91,7 +90,7 @@ export default function LoginPage() {
         </div>
 
         <p className="relative text-xs text-violet-300/60">
-          © {new Date().getFullYear()} ZScope. All rights reserved.
+          © {new Date().getFullYear()} Z-Scope Global Investment Capital. All rights reserved.
         </p>
       </div>
 
@@ -100,10 +99,8 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-600 shadow-lg shadow-violet-600/30">
-              <TrendingUp size={22} className="text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-white">ZScope</span>
+            <img src={logo} alt="Z-Scope" className="h-12 w-12 rounded-xl object-cover shadow-lg shadow-black/40" />
+            <span className="text-xl font-bold tracking-tight text-white">Z-Scope</span>
           </div>
 
           <div className="mb-8">

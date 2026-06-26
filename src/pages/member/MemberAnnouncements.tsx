@@ -27,12 +27,17 @@ export default function MemberAnnouncements() {
 
       <div className="space-y-3">
         {items?.map((a) => (
-          <div key={a.id} className="rounded-xl border border-gray-800 bg-[#141414] p-4">
-            <p className="text-sm font-medium text-gray-200">{a.title}</p>
-            <p className="mt-1 text-sm text-gray-400">{a.body}</p>
-            <p className="mt-2 text-xs text-gray-600">
-              {new Date(a.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
+          <div key={a.id} className="overflow-hidden rounded-xl border border-gray-800 bg-[#141414]">
+            {a.image_url && (
+              <img src={a.image_url} alt={a.title} className="max-h-56 w-full object-cover" />
+            )}
+            <div className="p-4">
+              <p className="text-sm font-medium text-gray-200">{a.title}</p>
+              <p className="mt-1 text-sm text-gray-400">{a.body}</p>
+              <p className="mt-2 text-xs text-gray-600">
+                {new Date(a.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
           </div>
         ))}
       </div>
