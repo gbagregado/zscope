@@ -46,8 +46,8 @@ export default function RegisterPage() {
         <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-violet-500/30 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 -left-20 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
 
-        <div className="relative flex items-center">
-          <img src={logo} alt="Z-Scope Global Investment Capital" className="h-20 w-20 rounded-2xl object-cover ring-1 ring-white/20 shadow-xl shadow-black/30" />
+        <div className="relative flex justify-center">
+          <img src={logo} alt="Z-Scope Global Investment Capital" className="h-40 w-40 rounded-3xl object-cover ring-1 ring-white/20 shadow-2xl shadow-black/40" />
         </div>
 
         <div className="relative max-w-md">
@@ -90,7 +90,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="mb-8 flex justify-center lg:hidden">
-            <img src={logo} alt="Z-Scope Global Investment Capital" className="h-24 w-24 rounded-2xl object-cover shadow-lg shadow-black/40" />
+            <img src={logo} alt="Z-Scope Global Investment Capital" className="h-40 w-40 rounded-3xl object-cover shadow-2xl shadow-black/40" />
           </div>
 
           <div className="mb-8">
