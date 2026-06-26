@@ -50,7 +50,7 @@ export default function AdminInvestmentCenters() {
   const save = useMutation({
     mutationFn: async (data: FormData & { image_url?: string | null; storage_path?: string | null }) => {
       if (editing) {
-        const patch: Partial<Center> = {
+        const patch: Database['public']['Tables']['investment_centers']['Update'] = {
           name: data.name,
           description: data.description || null,
           expected_return_pct: data.expected_return_pct,
