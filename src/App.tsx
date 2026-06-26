@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import PendingPage from './pages/PendingPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import { ConfirmProvider } from './components/ConfirmDialog'
 import AdminLayout from './layouts/AdminLayout'
 import MemberLayout from './layouts/MemberLayout'
 
@@ -91,9 +92,11 @@ function AppInner() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppInner />
-      </BrowserRouter>
+      <ConfirmProvider>
+        <BrowserRouter>
+          <AppInner />
+        </BrowserRouter>
+      </ConfirmProvider>
     </QueryClientProvider>
   )
 }

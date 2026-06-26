@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { useConfirm } from '../../components/ConfirmDialog'
 import { Plus, Trash2 } from 'lucide-react'
 
 const schema = z.object({
@@ -16,6 +17,7 @@ type FormData = z.infer<typeof schema>
 export default function AdminAnnouncements() {
   const qc = useQueryClient()
   const { profile } = useAuthStore()
+  const confirm = useConfirm()
   const [showForm, setShowForm] = useState(false)
 
   const { data: items, isLoading } = useQuery({
@@ -89,7 +91,15 @@ export default function AdminAnnouncements() {
                 <p className="mt-2 text-xs text-gray-600">{new Date(a.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
               </div>
               <button
-                onClick={() => { if (confirm('Delete announcement?')) del.mutate(a.id) }}
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: 'Delete announcement?',
+                    message: `"${a.title}" will be permanently removed for all members.`,
+                    confirmText: 'Delete',
+                    tone: 'danger',
+                  })
+                  if (ok) del.mutate(a.id)
+                }}
                 className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0"
               >
                 <Trash2 size={16} />

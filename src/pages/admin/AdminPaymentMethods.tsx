@@ -4,7 +4,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
-import { Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
+import { useConfirm } from '../../components/ConfirmDialog'
+import { Plus, Trash2, ToggleLeft, ToggleRight, Upload, QrCode } from 'lucide-react'
 
 const schema = z.object({
   name: z.string().min(1, 'Required'),
@@ -15,6 +16,7 @@ type FormData = z.infer<typeof schema>
 
 export default function AdminPaymentMethods() {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const [showForm, setShowForm] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [qrFile, setQrFile] = useState<File | null>(null)
@@ -101,13 +103,27 @@ export default function AdminPaymentMethods() {
             </div>
           ))}
           <div>
-            <label className="mb-1 block text-xs text-gray-500">QR Code Image (optional)</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setQrFile(e.target.files?.[0] ?? null)}
-              className="text-sm text-gray-400"
-            />
+            <label className="mb-1.5 block text-xs font-medium text-gray-400">QR Code Image</label>
+            <p className="mb-2 text-xs text-gray-500">Upload your GCash / Maya / bank QR so members can scan it when sending funds.</p>
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-gray-700 bg-[#0f0f0f] p-3 transition hover:border-violet-500/60 hover:bg-violet-500/5">
+              {qrFile ? (
+                <img src={URL.createObjectURL(qrFile)} alt="QR preview" className="h-16 w-16 rounded-lg border border-gray-700 object-contain bg-white p-1" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-gray-700 bg-[#141414] text-gray-600">
+                  <QrCode size={26} />
+                </div>
+              )}
+              <div className="flex flex-1 items-center gap-2 text-sm text-gray-400">
+                <Upload size={15} />
+                <span>{qrFile ? qrFile.name : 'Click to upload QR image'}</span>
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setQrFile(e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+            </label>
           </div>
           <button
             type="submit"
@@ -139,7 +155,15 @@ export default function AdminPaymentMethods() {
                 {m.is_active ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
               </button>
               <button
-                onClick={() => { if (confirm('Delete this payment method?')) deleteMethod.mutate(m.id) }}
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: 'Delete payment method?',
+                    message: `"${m.name}" will be permanently removed and members will no longer see its QR code.`,
+                    confirmText: 'Delete',
+                    tone: 'danger',
+                  })
+                  if (ok) deleteMethod.mutate(m.id)
+                }}
                 className="text-gray-600 hover:text-red-400 transition-colors"
               >
                 <Trash2 size={16} />
