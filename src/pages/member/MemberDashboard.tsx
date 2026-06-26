@@ -28,7 +28,7 @@ export default function MemberDashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transactions')
-        .select('type, amount, created_at')
+        .select('type, amount, source, created_at')
         .eq('member_id', profile!.id)
       if (error) throw error
       return data
@@ -61,11 +61,18 @@ export default function MemberDashboard() {
   let creditsThisMonth = 0, debitsThisMonth = 0
   let creditsLastMonth = 0, debitsLastMonth = 0
   let netToday = 0
+  let totalProfit = 0, profitThisMonth = 0, profitLastMonth = 0
 
   for (const tx of allTx ?? []) {
     const d = new Date(tx.created_at)
     const amt = Number(tx.amount)
     const isCredit = tx.type === 'credit'
+    const isProfit = tx.source === 'profit'
+    if (isProfit) {
+      totalProfit += amt
+      if (d >= startThisMonth) profitThisMonth += amt
+      else if (d >= startLastMonth) profitLastMonth += amt
+    }
     if (d >= startThisMonth) {
       if (isCredit) creditsThisMonth += amt; else debitsThisMonth += amt
     } else if (d >= startLastMonth) {
@@ -85,6 +92,7 @@ export default function MemberDashboard() {
   const creditsTrend = pctChange(creditsThisMonth, creditsLastMonth)
   const debitsTrend = pctChange(debitsThisMonth, debitsLastMonth)
   const netTrend = pctChange(netThisMonth, netLastMonth)
+  const profitTrend = pctChange(profitThisMonth, profitLastMonth)
 
   const fmtPct = (p: number | null) =>
     p === null ? 'New' : `${p >= 0 ? '+' : ''}${p.toFixed(1)}%`
@@ -97,9 +105,9 @@ export default function MemberDashboard() {
       </div>
 
       {/* Stat cards with trends */}
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-5">
         {/* Current Balance */}
-        <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-transparent p-3 sm:rounded-2xl sm:p-5">
+        <div className="col-span-2 rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-transparent p-3 sm:rounded-2xl sm:p-5 xl:col-span-1">
           <div className="mb-2 flex items-center gap-2 sm:mb-3">
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 ring-1 ring-violet-500/20 sm:h-9 sm:w-9">
               <Wallet className="h-4 w-4 text-violet-300 sm:h-[18px] sm:w-[18px]" />
@@ -113,6 +121,24 @@ export default function MemberDashboard() {
               {netToday >= 0 ? '+' : '-'}{fmt(Math.abs(netToday))}
             </span>
             <span className="text-gray-500">today</span>
+          </div>
+        </div>
+
+        {/* Total Profit */}
+        <div className="rounded-xl border border-green-500/30 bg-gradient-to-br from-green-500/10 to-transparent p-3 sm:rounded-2xl sm:p-5">
+          <div className="mb-2 flex items-center gap-2 sm:mb-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-green-500/15 ring-1 ring-green-500/20 sm:h-9 sm:w-9">
+              <TrendingUp className="h-4 w-4 text-green-300 sm:h-[18px] sm:w-[18px]" />
+            </div>
+            <p className="text-xs text-green-200/80 sm:text-sm">Total Profit</p>
+          </div>
+          <p className="text-lg font-bold text-green-300 sm:text-2xl">{fmt(totalProfit)}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[11px] sm:mt-2 sm:text-xs">
+            <span className={(profitTrend ?? 0) >= 0 ? 'flex items-center gap-0.5 font-medium text-green-400' : 'flex items-center gap-0.5 font-medium text-red-400'}>
+              {(profitTrend ?? 0) >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+              {fmtPct(profitTrend)}
+            </span>
+            <span className="text-gray-500">vs last month</span>
           </div>
         </div>
 

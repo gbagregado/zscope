@@ -24,7 +24,7 @@ export interface Database {
           amount: number
           description: string
           created_by: string
-          source: 'manual' | 'payment_request' | 'withdrawal'
+          source: 'manual' | 'payment_request' | 'withdrawal' | 'profit'
           reference_id: string | null
           created_at: string
         }

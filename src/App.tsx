@@ -19,6 +19,7 @@ import AdminPaymentRequests from './pages/admin/AdminPaymentRequests'
 import AdminWithdrawalRequests from './pages/admin/AdminWithdrawalRequests'
 import AdminAnnouncements from './pages/admin/AdminAnnouncements'
 import AdminAdvertisements from './pages/admin/AdminAdvertisements'
+import AdminProfits from './pages/admin/AdminProfits'
 
 // Member pages
 import MemberDashboard from './pages/member/MemberDashboard'
@@ -70,6 +71,7 @@ function AppInner() {
           <Route path="payment-methods" element={<AdminPaymentMethods />} />
           <Route path="payment-requests" element={<AdminPaymentRequests />} />
           <Route path="withdrawal-requests" element={<AdminWithdrawalRequests />} />
+          <Route path="profits" element={<AdminProfits />} />
           <Route path="announcements" element={<AdminAnnouncements />} />
           <Route path="advertisements" element={<AdminAdvertisements />} />
         </Route>

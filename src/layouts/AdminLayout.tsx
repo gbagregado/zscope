@@ -7,6 +7,7 @@ import {
   ArrowUpCircle,
   Megaphone,
   Image,
+  TrendingUp,
   LogOut,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -17,6 +18,7 @@ const nav = [
   { to: '/admin/payment-methods', label: 'Payment Methods', icon: CreditCard },
   { to: '/admin/payment-requests', label: 'Add Funds', icon: ArrowDownCircle },
   { to: '/admin/withdrawal-requests', label: 'Withdrawals', icon: ArrowUpCircle },
+  { to: '/admin/profits', label: 'Profits', icon: TrendingUp },
   { to: '/admin/announcements', label: 'Announcements', icon: Megaphone },
   { to: '/admin/advertisements', label: 'Advertisements', icon: Image },
 ]
@@ -26,6 +28,7 @@ const pageTitles: Record<string, string> = {
   '/admin/payment-methods': 'Payment Methods',
   '/admin/payment-requests': 'Add Funds Requests',
   '/admin/withdrawal-requests': 'Withdrawal Requests',
+  '/admin/profits': 'Add Profit',
   '/admin/announcements': 'Announcements',
   '/admin/advertisements': 'Advertisements',
 }
