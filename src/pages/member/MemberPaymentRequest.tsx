@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, AlertCircle } from 'lucide-react'
 
 const schema = z.object({
   amount: z.number({ message: 'Enter an amount' }).positive('Must be positive'),
@@ -18,6 +18,7 @@ export default function MemberPaymentRequest() {
   const { profile } = useAuthStore()
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [success, setSuccess] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const { data: methods } = useQuery({
     queryKey: ['payment-methods'],
@@ -45,16 +46,21 @@ export default function MemberPaymentRequest() {
       })
       if (error) throw error
     },
-    onSuccess: () => { reset(); setScreenshot(null); setSelectedMethod(''); setSuccess(true) },
+    onSuccess: () => { reset(); setScreenshot(null); setSelectedMethod(''); setSuccess(true); setSubmitError('') },
+    onError: (e: unknown) => setSubmitError(e instanceof Error ? e.message : 'Failed to submit request'),
   })
 
   async function onSubmit(data: FormData) {
+    setSubmitError('')
     let screenshot_url: string | undefined
     if (screenshot) {
       const ext = screenshot.name.split('.').pop()
       const path = `${profile!.id}/${Date.now()}.${ext}`
       const { error: upErr } = await supabase.storage.from('payment-proofs').upload(path, screenshot)
-      if (upErr) throw upErr
+      if (upErr) {
+        setSubmitError(`Screenshot upload failed: ${upErr.message}. You can submit without a screenshot, or ask the admin to apply storage policies.`)
+        return
+      }
       const { data: signed } = await supabase.storage.from('payment-proofs').createSignedUrl(path, 60 * 60 * 24 * 365)
       screenshot_url = signed?.signedUrl
     }
@@ -111,6 +117,13 @@ export default function MemberPaymentRequest() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-gray-800 bg-[#141414] p-4">
         <h2 className="text-sm font-medium text-gray-300">Payment Details</h2>
+
+        {submitError && (
+          <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
+            <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" />
+            <p className="text-xs text-red-300">{submitError}</p>
+          </div>
+        )}
 
         <div>
           <label className="mb-1 block text-xs text-gray-500">Payment method used</label>
