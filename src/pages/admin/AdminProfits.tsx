@@ -4,6 +4,14 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { TrendingUp, Search } from 'lucide-react'
 
+type ProfitRow = {
+  id: string
+  amount: number
+  description: string
+  created_at: string
+  member: { full_name: string } | null
+}
+
 export default function AdminProfits() {
   const qc = useQueryClient()
   const { profile } = useAuthStore()
@@ -26,7 +34,7 @@ export default function AdminProfits() {
 
   const { data: recentProfits } = useQuery({
     queryKey: ['admin-recent-profits'],
-    queryFn: async () => {
+    queryFn: async (): Promise<ProfitRow[]> => {
       const { data, error } = await supabase
         .from('transactions')
         .select('id, amount, description, created_at, member:profiles!member_id(full_name)')
@@ -34,7 +42,7 @@ export default function AdminProfits() {
         .order('created_at', { ascending: false })
         .limit(10)
       if (error) throw error
-      return data
+      return (data ?? []) as unknown as ProfitRow[]
     },
   })
 
@@ -161,7 +169,7 @@ export default function AdminProfits() {
           {recentProfits?.map((p) => (
             <div key={p.id} className="flex items-center justify-between rounded-lg border border-gray-800 bg-[#141414] px-4 py-2.5">
               <div className="min-w-0">
-                <p className="truncate text-sm text-gray-300">{(p.member as { full_name: string } | null)?.full_name ?? 'Member'}</p>
+                <p className="truncate text-sm text-gray-300">{p.member?.full_name ?? 'Member'}</p>
                 <p className="truncate text-xs text-gray-600">
                   {p.description} · {new Date(p.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                 </p>
