@@ -17,7 +17,7 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
-const inputClass = "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-violet-500 focus:bg-white/[0.05] focus:ring-4 focus:ring-violet-500/10"
+const inputClass = "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-violet-500 focus:bg-white/[0.05] focus:ring-4 focus:ring-violet-500/10"
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -138,7 +138,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-1 w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 w-full rounded-xl bg-violet-600 py-4 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? 'Creating account…' : 'Create account'}
             </button>

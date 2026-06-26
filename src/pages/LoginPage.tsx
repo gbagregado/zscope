@@ -125,7 +125,7 @@ export default function LoginPage() {
                 {...register('email')}
                 type="email"
                 autoComplete="email"
-                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-violet-500 focus:bg-white/[0.05] focus:ring-4 focus:ring-violet-500/10"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-violet-500 focus:bg-white/[0.05] focus:ring-4 focus:ring-violet-500/10"
                 placeholder="you@example.com"
               />
               {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
@@ -138,7 +138,7 @@ export default function LoginPage() {
                   {...register('password')}
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 pr-11 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-violet-500 focus:bg-white/[0.05] focus:ring-4 focus:ring-violet-500/10"
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 pr-11 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-violet-500 focus:bg-white/[0.05] focus:ring-4 focus:ring-violet-500/10"
                   placeholder="Enter your password"
                 />
                 <button
@@ -156,7 +156,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-1 w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 w-full rounded-xl bg-violet-600 py-4 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? 'Signing in…' : 'Sign in'}
             </button>
