@@ -5,6 +5,7 @@ import {
   List,
   PlusCircle,
   ArrowUpCircle,
+  Landmark,
   Megaphone,
   LogOut,
 } from 'lucide-react'
@@ -16,6 +17,7 @@ const nav = [
   { to: '/dashboard/transactions', label: 'History', icon: List },
   { to: '/dashboard/add-funds', label: 'Add Funds', icon: PlusCircle },
   { to: '/dashboard/withdraw', label: 'Withdraw', icon: ArrowUpCircle },
+  { to: '/dashboard/investments', label: 'Invest', icon: Landmark },
   { to: '/dashboard/announcements', label: 'Updates', icon: Megaphone },
 ]
 
@@ -24,6 +26,7 @@ const pageTitles: Record<string, string> = {
   '/dashboard/transactions': 'Transaction History',
   '/dashboard/add-funds': 'Add Funds',
   '/dashboard/withdraw': 'Withdraw Funds',
+  '/dashboard/investments': 'Investments',
   '/dashboard/announcements': 'Announcements',
 }
 

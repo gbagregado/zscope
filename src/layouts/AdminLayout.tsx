@@ -8,6 +8,8 @@ import {
   Megaphone,
   Image,
   TrendingUp,
+  Building2,
+  Landmark,
   LogOut,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -19,6 +21,8 @@ const nav = [
   { to: '/admin/payment-requests', label: 'Add Funds', icon: ArrowDownCircle },
   { to: '/admin/withdrawal-requests', label: 'Withdrawals', icon: ArrowUpCircle },
   { to: '/admin/profits', label: 'Profits', icon: TrendingUp },
+  { to: '/admin/investment-centers', label: 'Inv. Centers', icon: Building2 },
+  { to: '/admin/investments', label: 'Investments', icon: Landmark },
   { to: '/admin/announcements', label: 'Announcements', icon: Megaphone },
   { to: '/admin/advertisements', label: 'Advertisements', icon: Image },
 ]
@@ -29,6 +33,8 @@ const pageTitles: Record<string, string> = {
   '/admin/payment-requests': 'Add Funds Requests',
   '/admin/withdrawal-requests': 'Withdrawal Requests',
   '/admin/profits': 'Add Profit',
+  '/admin/investment-centers': 'Investment Centers',
+  '/admin/investments': 'Investments',
   '/admin/announcements': 'Announcements',
   '/admin/advertisements': 'Advertisements',
 }

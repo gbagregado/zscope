@@ -152,6 +152,118 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['advertisements']['Insert']>
         Relationships: []
       }
+      investment_centers: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          image_url: string | null
+          storage_path: string | null
+          expected_return_pct: number
+          min_investment: number
+          maintaining_balance: number
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          name: string
+          description?: string | null
+          image_url?: string | null
+          storage_path?: string | null
+          expected_return_pct?: number
+          min_investment?: number
+          maintaining_balance?: number
+          is_active?: boolean
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['investment_centers']['Insert']>
+        Relationships: []
+      }
+      investments: {
+        Row: {
+          id: string
+          member_id: string
+          center_id: string
+          status: 'active' | 'closed'
+          created_at: string
+        }
+        Insert: {
+          member_id: string
+          center_id: string
+          status?: 'active' | 'closed'
+        }
+        Update: Partial<Database['public']['Tables']['investments']['Insert']>
+        Relationships: []
+      }
+      investment_transactions: {
+        Row: {
+          id: string
+          investment_id: string
+          type: 'deposit' | 'profit' | 'withdrawal'
+          amount: number
+          description: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          investment_id: string
+          type: 'deposit' | 'profit' | 'withdrawal'
+          amount: number
+          description?: string | null
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['investment_transactions']['Insert']>
+        Relationships: []
+      }
+      investment_join_requests: {
+        Row: {
+          id: string
+          member_id: string
+          center_id: string
+          amount: number
+          status: 'pending' | 'approved' | 'rejected'
+          admin_notes: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          member_id: string
+          center_id: string
+          amount: number
+          status?: 'pending' | 'approved' | 'rejected'
+          admin_notes?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['investment_join_requests']['Insert']>
+        Relationships: []
+      }
+      investment_withdrawal_requests: {
+        Row: {
+          id: string
+          investment_id: string
+          member_id: string
+          amount: number
+          status: 'pending' | 'approved' | 'rejected'
+          admin_notes: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          investment_id: string
+          member_id: string
+          amount: number
+          status?: 'pending' | 'approved' | 'rejected'
+          admin_notes?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['investment_withdrawal_requests']['Insert']>
+        Relationships: []
+      }
     }
     Views: {
       member_balances: {
@@ -165,7 +277,34 @@ export interface Database {
         }
         Relationships: []
       }
+      investment_balances: {
+        Row: {
+          investment_id: string
+          member_id: string
+          center_id: string
+          status: 'active' | 'closed'
+          created_at: string
+          balance: number
+          total_deposits: number
+          total_profit: number
+          total_withdrawn: number
+        }
+        Relationships: []
+      }
     }
-    Functions: Record<string, never>
+    Functions: {
+      approve_investment_join: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+      add_investment_profit: {
+        Args: { p_investment_id: string; p_amount: number; p_note: string }
+        Returns: undefined
+      }
+      approve_investment_withdrawal: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+    }
   }
 }

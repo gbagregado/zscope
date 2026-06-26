@@ -25,7 +25,7 @@ export default function AdminWithdrawalRequests() {
         .select('*, member:profiles!member_id(full_name, email)')
         .order('created_at', { ascending: false })
       if (error) throw error
-      return (data ?? []) as WithdrawalRow[]
+      return (data ?? []) as unknown as WithdrawalRow[]
     },
   })
 

@@ -20,6 +20,8 @@ import AdminWithdrawalRequests from './pages/admin/AdminWithdrawalRequests'
 import AdminAnnouncements from './pages/admin/AdminAnnouncements'
 import AdminAdvertisements from './pages/admin/AdminAdvertisements'
 import AdminProfits from './pages/admin/AdminProfits'
+import AdminInvestmentCenters from './pages/admin/AdminInvestmentCenters'
+import AdminInvestments from './pages/admin/AdminInvestments'
 
 // Member pages
 import MemberDashboard from './pages/member/MemberDashboard'
@@ -27,6 +29,7 @@ import MemberTransactions from './pages/member/MemberTransactions'
 import MemberPaymentRequest from './pages/member/MemberPaymentRequest'
 import MemberWithdrawal from './pages/member/MemberWithdrawal'
 import MemberAnnouncements from './pages/member/MemberAnnouncements'
+import MemberInvestments from './pages/member/MemberInvestments'
 
 const queryClient = new QueryClient()
 
@@ -72,6 +75,8 @@ function AppInner() {
           <Route path="payment-requests" element={<AdminPaymentRequests />} />
           <Route path="withdrawal-requests" element={<AdminWithdrawalRequests />} />
           <Route path="profits" element={<AdminProfits />} />
+          <Route path="investment-centers" element={<AdminInvestmentCenters />} />
+          <Route path="investments" element={<AdminInvestments />} />
           <Route path="announcements" element={<AdminAnnouncements />} />
           <Route path="advertisements" element={<AdminAdvertisements />} />
         </Route>
@@ -84,6 +89,7 @@ function AppInner() {
           <Route path="transactions" element={<MemberTransactions />} />
           <Route path="add-funds" element={<MemberPaymentRequest />} />
           <Route path="withdraw" element={<MemberWithdrawal />} />
+          <Route path="investments" element={<MemberInvestments />} />
           <Route path="announcements" element={<MemberAnnouncements />} />
         </Route>
       </Route>

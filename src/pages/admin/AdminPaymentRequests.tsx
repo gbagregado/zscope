@@ -23,7 +23,7 @@ export default function AdminPaymentRequests() {
         .select('*, member:profiles!member_id(full_name, email)')
         .order('created_at', { ascending: false })
       if (error) throw error
-      return (data ?? []) as PaymentRow[]
+      return (data ?? []) as unknown as PaymentRow[]
     },
   })
 
