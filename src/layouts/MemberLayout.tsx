@@ -43,7 +43,7 @@ export default function MemberLayout() {
       {/* Sidebar — desktop */}
       <aside className="hidden md:flex w-52 shrink-0 flex-col border-r border-white/6 bg-[#111111]">
         {/* Brand */}
-        <div className="flex h-14 items-center px-4 border-b border-white/6">
+        <div className="flex h-14 items-center justify-center px-4 border-b border-white/6">
           <img src={logo} alt="Z-Scope" className="h-10 w-10 rounded-lg object-cover" />
         </div>
 

@@ -46,9 +46,9 @@ export default function AdminLayout() {
       {/* Sidebar — desktop */}
       <aside className="hidden md:flex w-52 shrink-0 flex-col border-r border-white/6 bg-[#111111]">
         {/* Brand */}
-        <div className="flex h-14 items-center gap-2.5 px-4 border-b border-white/6">
+        <div className="relative flex h-14 items-center justify-center px-4 border-b border-white/6">
           <img src={logo} alt="Z-Scope" className="h-10 w-10 rounded-lg object-cover" />
-          <span className="ml-auto rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-400">
+          <span className="absolute right-4 rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-400">
             ADMIN
           </span>
         </div>
