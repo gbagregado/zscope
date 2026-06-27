@@ -125,15 +125,16 @@ export default function AdminLayout() {
             <NavLink
               key={to}
               to={to}
+              title={label}
+              aria-label={label}
               className={({ isActive }) =>
                 clsx(
-                  'flex flex-1 flex-col items-center gap-1 py-2.5 text-[9px] font-medium uppercase tracking-wide transition',
+                  'flex flex-1 items-center justify-center py-3 transition',
                   isActive ? 'text-violet-400' : 'text-gray-600'
                 )
               }
             >
-              <Icon size={18} />
-              <span>{label.split(' ')[0]}</span>
+              <Icon size={20} />
             </NavLink>
           ))}
         </nav>
