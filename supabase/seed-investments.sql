@@ -47,7 +47,11 @@ begin
       insert into auth.users (
         id, instance_id, aud, role, email, encrypted_password,
         email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-        created_at, updated_at
+        created_at, updated_at,
+        -- GoTrue requires these to be non-NULL strings or login 500s
+        confirmation_token, recovery_token, email_change,
+        email_change_token_new, email_change_token_current,
+        phone_change, phone_change_token, reauthentication_token
       ) values (
         v_uid,
         '00000000-0000-0000-0000-000000000000',
@@ -57,7 +61,18 @@ begin
         now(),
         '{"provider":"email","providers":["email"]}'::jsonb,
         jsonb_build_object('full_name', m.full_name),
-        now(), now()
+        now(), now(),
+        '', '', '', '', '', '', '', ''
+      );
+
+      -- GoTrue requires an email identity row for password sign-in
+      insert into auth.identities (
+        id, user_id, provider_id, identity_data, provider,
+        last_sign_in_at, created_at, updated_at
+      ) values (
+        gen_random_uuid(), v_uid, v_uid::text,
+        jsonb_build_object('sub', v_uid::text, 'email', m.email, 'email_verified', true),
+        'email', now(), now(), now()
       );
     end if;
 

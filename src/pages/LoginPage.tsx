@@ -30,7 +30,11 @@ export default function LoginPage() {
       email: data.email,
       password: data.password,
     })
-    if (authError) { setError(authError.message); return }
+    if (authError) {
+      const msg = authError.message?.trim()
+      setError(msg && msg !== '{}' ? msg : 'Unable to sign in. Please check your email and password and try again.')
+      return
+    }
     if (!authData.user) return
 
     const { data: profile } = await supabase
