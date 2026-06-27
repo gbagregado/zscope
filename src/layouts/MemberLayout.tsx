@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import {
-  LayoutDashboard,
+  Home,
   List,
   PlusCircle,
   ArrowUpCircle,
@@ -13,7 +13,7 @@ import clsx from 'clsx'
 import logo from '../assets/logo.jpeg'
 
 const nav = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/dashboard', label: 'Dashboard', icon: Home, end: true },
   { to: '/dashboard/transactions', label: 'History', icon: List },
   { to: '/dashboard/add-funds', label: 'Add Funds', icon: PlusCircle },
   { to: '/dashboard/withdraw', label: 'Withdraw', icon: ArrowUpCircle },
