@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
 
 export type PendingCounts = {
@@ -9,10 +10,22 @@ export type PendingCounts = {
   total: number
 }
 
+// Tables whose inserts/updates affect the pending badges.
+const WATCH_TABLES = [
+  'profiles',
+  'payment_requests',
+  'withdrawal_requests',
+  'investment_join_requests',
+  'investment_withdrawal_requests',
+]
+
 export function usePendingCounts() {
-  return useQuery({
+  const qc = useQueryClient()
+
+  const query = useQuery({
     queryKey: ['pending-counts'],
-    refetchInterval: 30_000,
+    // Realtime drives updates; keep a slow poll as a safety net.
+    refetchInterval: 5 * 60_000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<PendingCounts> => {
       const [memR, payR, wdR, joinR, pulloutR] = await Promise.all([
@@ -29,4 +42,18 @@ export function usePendingCounts() {
       return { members, payments, withdrawals, investments, total: members + payments + withdrawals + investments }
     },
   })
+
+  useEffect(() => {
+    const channel = supabase.channel('pending-counts')
+    for (const table of WATCH_TABLES) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+        qc.invalidateQueries({ queryKey: ['pending-counts'] })
+        qc.invalidateQueries({ queryKey: ['admin-metrics'] })
+      })
+    }
+    channel.subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [qc])
+
+  return query
 }
