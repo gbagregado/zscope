@@ -99,11 +99,16 @@ export default function AdminPaymentMethods() {
           {saveError && (
             <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">{saveError}</div>
           )}
-          {['name', 'account_name', 'account_number'].map((field) => (
+          {([
+            { field: 'name', label: 'Name (e.g. Solana Wallet)', placeholder: 'Solana Wallet' },
+            { field: 'account_name', label: 'Network / Chain', placeholder: 'e.g. Solana' },
+            { field: 'account_number', label: 'Wallet address', placeholder: 'Your SOL wallet address' },
+          ] as const).map(({ field, label, placeholder }) => (
             <div key={field}>
-              <label className="mb-1 block text-xs text-gray-500 capitalize">{field.replace('_', ' ')}</label>
+              <label className="mb-1 block text-xs text-gray-500">{label}</label>
               <input
                 {...register(field as keyof FormData)}
+                placeholder={placeholder}
                 className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none"
               />
               {errors[field as keyof FormData] && (
@@ -112,8 +117,8 @@ export default function AdminPaymentMethods() {
             </div>
           ))}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-400">QR Code Image</label>
-            <p className="mb-2 text-xs text-gray-500">Upload your GCash / Maya / bank QR so members can scan it when sending funds.</p>
+            <label className="mb-1.5 block text-xs font-medium text-gray-400">Wallet QR Code (optional)</label>
+            <p className="mb-2 text-xs text-gray-500">Upload your Solana wallet QR so members can scan it when sending funds.</p>
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-gray-700 bg-[#0f0f0f] p-3 transition hover:border-violet-500/60 hover:bg-violet-500/5">
               {qrFile ? (
                 <img src={URL.createObjectURL(qrFile)} alt="QR preview" className="h-16 w-16 rounded-lg border border-gray-700 object-contain bg-white p-1" />

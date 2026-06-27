@@ -63,7 +63,7 @@ export default function MemberDashboard() {
     },
   })
 
-  const fmt = (n: number) => `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
   // --- Real trends computed from transaction history ---
   const now = new Date()

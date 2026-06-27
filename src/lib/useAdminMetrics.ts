@@ -202,10 +202,10 @@ export function useAdminMetrics() {
   })
 }
 
-export const peso = (n: number) => `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+export const peso = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 export const pesoShort = (n: number) => {
   const a = Math.abs(n)
-  if (a >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1)}M`
-  if (a >= 1_000) return `₱${(n / 1_000).toFixed(1)}k`
-  return `₱${n.toFixed(0)}`
+  if (a >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (a >= 1_000) return `$${(n / 1_000).toFixed(1)}k`
+  return `$${n.toFixed(0)}`
 }

@@ -76,7 +76,7 @@ export default function AdminProfits() {
     },
   })
 
-  const fmt = (n: number) => `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
   function submit(memberId: string) {
     const raw = amounts[memberId]
@@ -174,7 +174,7 @@ export default function AdminProfits() {
           </div>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <div className="relative sm:w-40">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
               <input type="number" min="0" step="0.01" value={bulkAmount} onChange={(e) => setBulkAmount(e.target.value)} placeholder="Amount each" className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 pl-7 pr-3 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
             </div>
             <input value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} placeholder="Note (optional)" className="flex-1 rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
@@ -210,7 +210,7 @@ export default function AdminProfits() {
             </div>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <div className="relative sm:w-40">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
                 <input
                   type="number"
                   min="0"

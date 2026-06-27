@@ -79,7 +79,7 @@ export default function AdminPaymentRequests() {
                 <p className="text-xs text-gray-500">{(r.member as any)?.email}</p>
               </div>
               <div className="text-right">
-                <p className="text-base font-semibold text-green-400">₱{Number(r.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+                <p className="text-base font-semibold text-green-400">${Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 <p className="text-xs text-gray-500">{r.payment_method}</p>
               </div>
             </div>
@@ -127,7 +127,7 @@ export default function AdminPaymentRequests() {
                   <p className="text-xs text-gray-500">{r.reference_number}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-gray-200">₱{Number(r.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-gray-200">${Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                   <span className={clsx('text-xs', r.status === 'confirmed' ? 'text-green-400' : 'text-red-400')}>
                     {r.status}
                   </span>

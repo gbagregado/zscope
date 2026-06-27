@@ -20,7 +20,7 @@ export default function MemberTransactions() {
     },
   })
 
-  const fmt = (n: number) => `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
   if (isLoading) return <div className="text-gray-500 text-sm">Loading…</div>
 

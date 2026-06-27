@@ -9,9 +9,8 @@ import { CheckCircle } from 'lucide-react'
 
 const schema = z.object({
   amount: z.number({ message: 'Enter an amount' }).positive('Must be positive'),
-  member_payment_method: z.string().min(1, 'Required'),
-  member_account_name: z.string().min(1, 'Required'),
-  member_account_number: z.string().min(1, 'Required'),
+  member_payment_method: z.string().min(1, 'Enter the chain / network'),
+  member_account_number: z.string().min(1, 'Enter your wallet address'),
 })
 type FormData = z.infer<typeof schema>
 
@@ -37,14 +36,17 @@ export default function MemberWithdrawal() {
     mutationFn: async (data: FormData) => {
       const { error } = await supabase.from('withdrawal_requests').insert({
         member_id: profile!.id,
-        ...data,
+        amount: data.amount,
+        member_payment_method: data.member_payment_method,
+        member_account_number: data.member_account_number,
+        member_account_name: '',
       })
       if (error) throw error
     },
     onSuccess: () => { reset(); setSuccess(true) },
   })
 
-  const fmt = (n: number) => `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
   if (success) {
     return (
@@ -68,7 +70,7 @@ export default function MemberWithdrawal() {
 
       <form onSubmit={handleSubmit((d) => submit.mutate(d))} className="space-y-4 rounded-xl border border-gray-800 bg-[#141414] p-4">
         <div>
-          <label className="mb-1 block text-xs text-gray-500">Amount (₱)</label>
+          <label className="mb-1 block text-xs text-gray-500">Amount ($)</label>
           <input
             {...register('amount', { valueAsNumber: true })}
             type="number"
@@ -81,31 +83,21 @@ export default function MemberWithdrawal() {
         </div>
 
         <div>
-          <label className="mb-1 block text-xs text-gray-500">Send via (GCash, Maya, BDO, etc.)</label>
+          <label className="mb-1 block text-xs text-gray-500">Chain / Network</label>
           <input
             {...register('member_payment_method')}
             className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none"
-            placeholder="e.g. GCash"
+            placeholder="e.g. Solana"
           />
           {errors.member_payment_method && <p className="mt-1 text-xs text-red-400">{errors.member_payment_method.message}</p>}
         </div>
 
         <div>
-          <label className="mb-1 block text-xs text-gray-500">Account name</label>
-          <input
-            {...register('member_account_name')}
-            className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none"
-            placeholder="Juan dela Cruz"
-          />
-          {errors.member_account_name && <p className="mt-1 text-xs text-red-400">{errors.member_account_name.message}</p>}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs text-gray-500">Account number / mobile number</label>
+          <label className="mb-1 block text-xs text-gray-500">Wallet address</label>
           <input
             {...register('member_account_number')}
             className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none"
-            placeholder="09XX-XXX-XXXX"
+            placeholder="Your SOL wallet address"
           />
           {errors.member_account_number && <p className="mt-1 text-xs text-red-400">{errors.member_account_number.message}</p>}
         </div>

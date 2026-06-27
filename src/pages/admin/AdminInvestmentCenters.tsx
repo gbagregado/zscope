@@ -101,7 +101,7 @@ export default function AdminInvestmentCenters() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['investment-centers-admin'] }),
   })
 
-  const fmt = (n: number) => `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
   function openNew() {
     setEditing(null)
@@ -185,16 +185,16 @@ export default function AdminInvestmentCenters() {
               <input type="number" step="0.01" {...register('expected_return_pct', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-500">Min Investment (₱)</label>
+              <label className="mb-1 block text-xs text-gray-500">Min Investment ($)</label>
               <input type="number" step="0.01" {...register('min_investment', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-500">Maintaining Balance (₱)</label>
+              <label className="mb-1 block text-xs text-gray-500">Maintaining Balance ($)</label>
               <input type="number" step="0.01" {...register('maintaining_balance', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs text-gray-500">Fund Cap (₱) <span className="text-gray-600">— max total funds; 0 = unlimited</span></label>
+            <label className="mb-1 block text-xs text-gray-500">Fund Cap ($) <span className="text-gray-600">— max total funds; 0 = unlimited</span></label>
             <input type="number" step="0.01" {...register('fund_cap', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
           </div>
           <div>

@@ -89,11 +89,11 @@ export default function AdminWithdrawalRequests() {
                 <p className="text-sm font-medium text-gray-200">{(r.member as any)?.full_name}</p>
                 <p className="text-xs text-gray-500">{(r.member as any)?.email}</p>
               </div>
-              <p className="text-base font-semibold text-red-400">₱{Number(r.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+              <p className="text-base font-semibold text-red-400">${Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
             </div>
             <div className="text-xs text-gray-400 space-y-1">
-              <p>Send to: <span className="text-gray-300">{r.member_payment_method} · {r.member_account_name}</span></p>
-              <p>Account #: <span className="text-gray-300">{r.member_account_number}</span></p>
+              <p>Chain / Network: <span className="text-gray-300">{r.member_payment_method}</span></p>
+              <p>Wallet address: <span className="break-all text-gray-300">{r.member_account_number}</span></p>
             </div>
             <input
               placeholder="Reference number"
@@ -143,10 +143,10 @@ export default function AdminWithdrawalRequests() {
               <div key={r.id} className="flex items-center justify-between rounded-xl border border-gray-800 bg-[#141414] p-3 text-sm">
                 <div>
                   <p className="text-gray-300">{(r.member as any)?.full_name}</p>
-                  <p className="text-xs text-gray-500">{r.member_account_name} · {r.member_account_number}</p>
+                  <p className="break-all text-xs text-gray-500">{r.member_payment_method} · {r.member_account_number}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-gray-200">₱{Number(r.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-gray-200">${Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                   <div className="flex items-center gap-1 justify-end">
                     <span className={clsx('text-xs', r.status === 'approved' ? 'text-green-400' : 'text-red-400')}>{r.status}</span>
                     {r.proof_url && (

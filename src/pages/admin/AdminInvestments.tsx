@@ -22,7 +22,7 @@ type WdReq = {
   investment: { center_id: string } | null
 }
 
-const fmt = (n: number) => `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
 
 export default function AdminInvestments() {
@@ -424,7 +424,7 @@ export default function AdminInvestments() {
 
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="relative sm:w-44">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
                 <input type="number" min="0" step="0.01" value={distAmount} onChange={(e) => setDistAmount(e.target.value)} placeholder="Total profit" className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 pl-7 pr-3 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
               </div>
               <div className="inline-flex rounded-lg border border-gray-700 bg-[#0f0f0f] p-0.5 text-xs">
@@ -505,7 +505,7 @@ export default function AdminInvestments() {
             </div>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <div className="relative sm:w-44">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
                 <input type="number" min="0" step="0.01" value={profitInputs[m.investment_id] ?? ''} onChange={(e) => setProfitInputs((p) => ({ ...p, [m.investment_id]: e.target.value }))} placeholder="Profit amount" className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 pl-7 pr-3 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
               </div>
               <button onClick={() => submitProfit(m.investment_id)} disabled={addProfit.isPending} className="flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50 transition-colors"><TrendingUp size={15} /> Add Profit</button>

@@ -139,7 +139,7 @@ export default function MemberPaymentRequest() {
         </div>
 
         <div>
-          <label className="mb-1 block text-xs text-gray-500">Amount (₱)</label>
+          <label className="mb-1 block text-xs text-gray-500">Amount ($)</label>
           <input
             {...register('amount', { valueAsNumber: true })}
             type="number"
@@ -152,11 +152,11 @@ export default function MemberPaymentRequest() {
         </div>
 
         <div>
-          <label className="mb-1 block text-xs text-gray-500">Reference number</label>
+          <label className="mb-1 block text-xs text-gray-500">Transaction signature / hash</label>
           <input
             {...register('reference_number')}
             className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none"
-            placeholder="Transaction ref / confirmation #"
+            placeholder="Solana transaction signature (TXID)"
           />
           {errors.reference_number && <p className="mt-1 text-xs text-red-400">{errors.reference_number.message}</p>}
         </div>

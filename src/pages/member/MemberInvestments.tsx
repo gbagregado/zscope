@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { Building2, TrendingUp, X } from 'lucide-react'
 
-const fmt = (n: number) => `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
 type Center = {
   id: string; name: string; description: string | null; image_url: string | null
@@ -204,7 +204,7 @@ export default function MemberInvestments() {
 function AmountInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
       <input type="number" min="0" step="0.01" value={value} onChange={(e) => onChange(e.target.value)} placeholder="0.00" autoFocus className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] py-2.5 pl-7 pr-3 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
     </div>
   )
