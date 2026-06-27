@@ -13,6 +13,8 @@ import AdminLayout from './layouts/AdminLayout'
 import MemberLayout from './layouts/MemberLayout'
 
 // Admin pages
+import AdminOverview from './pages/admin/AdminOverview'
+import AdminReports from './pages/admin/AdminReports'
 import AdminMembers from './pages/admin/AdminMembers'
 import AdminPaymentMethods from './pages/admin/AdminPaymentMethods'
 import AdminPaymentRequests from './pages/admin/AdminPaymentRequests'
@@ -69,7 +71,8 @@ function AppInner() {
       {/* Admin routes */}
       <Route element={<ProtectedRoute role="admin" />}>
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="/admin/members" replace />} />
+          <Route index element={<AdminOverview />} />
+          <Route path="reports" element={<AdminReports />} />
           <Route path="members" element={<AdminMembers />} />
           <Route path="payment-methods" element={<AdminPaymentMethods />} />
           <Route path="payment-requests" element={<AdminPaymentRequests />} />

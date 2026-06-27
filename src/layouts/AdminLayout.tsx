@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import {
+  LayoutDashboard,
+  BarChart3,
   Users,
   CreditCard,
   ArrowDownCircle,
@@ -16,6 +18,8 @@ import clsx from 'clsx'
 import logo from '../assets/logo.jpeg'
 
 const nav = [
+  { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
   { to: '/admin/members', label: 'Members', icon: Users },
   { to: '/admin/payment-methods', label: 'Payment Methods', icon: CreditCard },
   { to: '/admin/payment-requests', label: 'Add Funds', icon: ArrowDownCircle },
@@ -28,6 +32,8 @@ const nav = [
 ]
 
 const pageTitles: Record<string, string> = {
+  '/admin': 'Overview',
+  '/admin/reports': 'Reports',
   '/admin/members': 'Members',
   '/admin/payment-methods': 'Payment Methods',
   '/admin/payment-requests': 'Add Funds Requests',
@@ -64,10 +70,11 @@ export default function AdminLayout() {
 
         {/* Nav */}
         <nav className="flex-1 space-y-0.5 p-2 pt-3">
-          {nav.map(({ to, label, icon: Icon }) => (
+          {nav.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
+              end={end}
               className={({ isActive }) =>
                 clsx(
                   'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all',
@@ -121,10 +128,11 @@ export default function AdminLayout() {
 
         {/* Mobile bottom nav */}
         <nav className="flex md:hidden fixed bottom-0 inset-x-0 border-t border-white/6 bg-[#111111]">
-          {nav.map(({ to, label, icon: Icon }) => (
+          {nav.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
+              end={end}
               title={label}
               aria-label={label}
               className={({ isActive }) =>
