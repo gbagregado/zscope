@@ -4,10 +4,10 @@ import { supabase } from '../../lib/supabase'
 import {
   CheckCircle, XCircle, TrendingUp, ArrowDownToLine, ArrowUpFromLine,
   Building2, ChevronRight, ArrowLeft, Users, Wallet, PiggyBank,
-  CheckSquare, Square, Sparkles, Search, X,
+  CheckSquare, Square, Sparkles, Search, X, AlertTriangle,
 } from 'lucide-react'
 
-type Center = { id: string; name: string; image_url: string | null }
+type Center = { id: string; name: string; image_url: string | null; fund_cap: number }
 type Balance = {
   investment_id: string; member_id: string; center_id: string; created_at: string
   balance: number; total_deposits: number; total_profit: number; total_withdrawn: number
@@ -44,7 +44,7 @@ export default function AdminInvestments() {
     queryFn: async (): Promise<Center[]> => {
       const { data, error } = await supabase
         .from('investment_centers')
-        .select('id, name, image_url')
+        .select('id, name, image_url, fund_cap')
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as Center[]
@@ -327,23 +327,63 @@ export default function AdminInvestments() {
           <Stat icon={<PiggyBank size={15} />} label="Total Deposits" value={fmt(selSummary?.totalDeposits ?? 0)} />
           <Stat icon={<ArrowUpFromLine size={15} />} label="Pulled Out" value={fmt(selSummary?.totalWithdrawn ?? 0)} />
         </div>
+
+        {/* Fund cap progress */}
+        {(() => {
+          const cap = Number(selectedCenter.fund_cap) || 0
+          const raised = (selSummary?.totalDeposits ?? 0) - (selSummary?.totalWithdrawn ?? 0)
+          if (cap <= 0) return (
+            <p className="mt-3 text-[11px] text-gray-600">Fund cap: Unlimited · Raised {fmt(raised)}</p>
+          )
+          const pct = Math.min(100, (raised / cap) * 100)
+          const full = raised >= cap
+          const near = !full && pct >= 90
+          const barColor = full ? 'bg-red-500' : near ? 'bg-yellow-500' : 'bg-violet-500'
+          return (
+            <div className="mt-4">
+              <div className="mb-1 flex items-center justify-between text-[11px]">
+                <span className="text-gray-500">Fund cap</span>
+                <span className={full ? 'font-medium text-red-400' : near ? 'font-medium text-yellow-400' : 'text-gray-400'}>
+                  {fmt(raised)} / {fmt(cap)} ({pct.toFixed(0)}%)
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-[#0f0f0f]">
+                <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+              </div>
+              {full
+                ? <p className="mt-1.5 flex items-center gap-1 text-[11px] text-red-400"><AlertTriangle size={12} /> Fund cap reached. New join requests will be blocked until the cap is raised or members pull out.</p>
+                : <p className="mt-1.5 text-[11px] text-gray-600">Remaining capacity: {fmt(cap - raised)}</p>}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Pending join requests */}
       {centerJoinReqs.length > 0 && (
         <section className="space-y-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-300"><ArrowDownToLine size={15} /> Join Requests</h2>
-          {centerJoinReqs.map((r) => (
-            <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-gray-200">{r.member?.full_name}</p>
-                <p className="truncate text-xs text-gray-500">wants to join with <span className="text-gray-300">{fmt(r.amount)}</span></p>
+          {centerJoinReqs.map((r) => {
+            const cap = Number(selectedCenter.fund_cap) || 0
+            const raised = (selSummary?.totalDeposits ?? 0) - (selSummary?.totalWithdrawn ?? 0)
+            const exceeds = cap > 0 && raised + Number(r.amount) > cap
+            return (
+            <div key={r.id} className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-200">{r.member?.full_name}</p>
+                  <p className="truncate text-xs text-gray-500">wants to join with <span className="text-gray-300">{fmt(r.amount)}</span></p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button onClick={() => approveJoin.mutate(r.id)} disabled={approveJoin.isPending || exceeds} title={exceeds ? 'Exceeds fund cap' : undefined} className="flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"><CheckCircle size={12} /> Approve</button>
+                  <button onClick={() => rejectJoin.mutate(r.id)} className="flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition"><XCircle size={12} /> Reject</button>
+                </div>
               </div>
-              <div className="flex shrink-0 gap-2">
-                <button onClick={() => approveJoin.mutate(r.id)} disabled={approveJoin.isPending} className="flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition disabled:opacity-50"><CheckCircle size={12} /> Approve</button>
-                <button onClick={() => rejectJoin.mutate(r.id)} className="flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition"><XCircle size={12} /> Reject</button>
-              </div>
+              {exceeds && (
+                <p className="mt-2 flex items-center gap-1 text-[11px] text-red-400"><AlertTriangle size={12} /> Approving would exceed the fund cap by {fmt(raised + Number(r.amount) - cap)}. Raise the cap or wait for pull-outs.</p>
+              )}
             </div>
+            )
+          })}
           ))}
         </section>
       )}

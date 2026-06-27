@@ -162,6 +162,7 @@ export interface Database {
           expected_return_pct: number
           min_investment: number
           maintaining_balance: number
+          fund_cap: number
           is_active: boolean
           created_by: string | null
           created_at: string
@@ -174,6 +175,7 @@ export interface Database {
           expected_return_pct?: number
           min_investment?: number
           maintaining_balance?: number
+          fund_cap?: number
           is_active?: boolean
           created_by?: string | null
         }
