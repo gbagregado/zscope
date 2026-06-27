@@ -96,7 +96,7 @@ export default function AdminProfits() {
         amount,
         description: note || 'Profit',
         created_by: profile!.id,
-        source: 'profit',
+        source: 'profit' as const,
         reference_id: null,
       }))
       const { error } = await supabase.from('transactions').insert(rows)
