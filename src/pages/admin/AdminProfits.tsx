@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { TrendingUp, Search } from 'lucide-react'
+import { TrendingUp, Search, CheckSquare, Square, X, Users } from 'lucide-react'
 
 type ProfitRow = {
   id: string
@@ -19,6 +19,10 @@ export default function AdminProfits() {
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [search, setSearch] = useState('')
   const [feedback, setFeedback] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
+  // bulk selection
+  const [selected, setSelected] = useState<Map<string, string>>(new Map()) // id -> full_name
+  const [bulkAmount, setBulkAmount] = useState('')
+  const [bulkNote, setBulkNote] = useState('')
 
   const { data: members, isLoading } = useQuery({
     queryKey: ['admin-profit-members'],
@@ -84,6 +88,46 @@ export default function AdminProfits() {
     addProfit.mutate({ memberId, amount, note: notes[memberId] ?? '' })
   }
 
+  const bulkAdd = useMutation({
+    mutationFn: async ({ ids, amount, note }: { ids: string[]; amount: number; note: string }) => {
+      const rows = ids.map((id) => ({
+        member_id: id,
+        type: 'credit' as const,
+        amount,
+        description: note || 'Profit',
+        created_by: profile!.id,
+        source: 'profit',
+        reference_id: null,
+      }))
+      const { error } = await supabase.from('transactions').insert(rows)
+      if (error) throw error
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-profit-members'] })
+      qc.invalidateQueries({ queryKey: ['admin-recent-profits'] })
+      setSelected(new Map())
+      setBulkAmount(''); setBulkNote('')
+      setFeedback({ id: 'bulk', msg: `Profit added to ${vars.ids.length} member${vars.ids.length === 1 ? '' : 's'}`, ok: true })
+      setTimeout(() => setFeedback(null), 3000)
+    },
+    onError: (e: unknown) => setFeedback({ id: 'bulk', msg: e instanceof Error ? e.message : 'Failed', ok: false }),
+  })
+
+  function toggleMember(id: string, name: string) {
+    setSelected((prev) => {
+      const n = new Map(prev)
+      if (n.has(id)) n.delete(id); else n.set(id, name)
+      return n
+    })
+  }
+
+  function submitBulk() {
+    const amount = Number(bulkAmount)
+    if (selected.size === 0) { setFeedback({ id: 'bulk', msg: 'Select at least one member', ok: false }); return }
+    if (!bulkAmount || isNaN(amount) || amount <= 0) { setFeedback({ id: 'bulk', msg: 'Enter a valid amount', ok: false }); return }
+    bulkAdd.mutate({ ids: [...selected.keys()], amount, note: bulkNote })
+  }
+
   if (isLoading) return <div className="text-gray-500 text-sm">Loading…</div>
 
   const filtered = (members ?? []).filter((m) =>
@@ -111,13 +155,50 @@ export default function AdminProfits() {
         />
       </div>
 
+      {/* Bulk selection tray */}
+      {selected.size > 0 && (
+        <div className="sticky top-2 z-10 rounded-xl border border-violet-500/30 bg-[#1a1626] p-4 shadow-lg">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-violet-200"><Users size={15} /> Selected ({selected.size})</h2>
+            <button onClick={() => setSelected(new Map())} className="text-xs text-gray-400 hover:text-gray-200">Clear all</button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {[...selected.entries()].map(([id, name]) => (
+              <span key={id} className="inline-flex items-center gap-1 rounded-full bg-violet-600/20 py-1 pl-2.5 pr-1 text-xs text-violet-200">
+                {name}
+                <button onClick={() => toggleMember(id, name)} className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-violet-500/40" aria-label={`Remove ${name}`}>
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <div className="relative sm:w-40">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+              <input type="number" min="0" step="0.01" value={bulkAmount} onChange={(e) => setBulkAmount(e.target.value)} placeholder="Amount each" className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 pl-7 pr-3 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+            </div>
+            <input value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} placeholder="Note (optional)" className="flex-1 rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+            <button onClick={submitBulk} disabled={bulkAdd.isPending} className="flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50 transition-colors">
+              <TrendingUp size={15} /> Add to {selected.size}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-gray-500">Each selected member receives the same amount. Search to find more members — your selection stays.</p>
+          {feedback?.id === 'bulk' && <p className={feedback.ok ? 'mt-1 text-xs text-green-400' : 'mt-1 text-xs text-red-400'}>{feedback.msg}</p>}
+        </div>
+      )}
+
       {/* Members */}
       <div className="space-y-2.5">
         {filtered.length === 0 && <p className="text-sm text-gray-600">No members found.</p>}
         {filtered.map((m) => (
-          <div key={m.member_id} className="rounded-xl border border-gray-800 bg-[#141414] p-4">
+          <div key={m.member_id} className={`rounded-xl border bg-[#141414] p-4 transition ${selected.has(m.member_id) ? 'border-violet-500/50' : 'border-gray-800'}`}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
+                <button onClick={() => toggleMember(m.member_id, m.full_name ?? 'Member')} className="shrink-0" aria-label="Select member">
+                  {selected.has(m.member_id)
+                    ? <CheckSquare size={18} className="text-violet-400" />
+                    : <Square size={18} className="text-gray-600" />}
+                </button>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-600/15 text-xs font-semibold text-violet-400">
                   {m.full_name?.[0]?.toUpperCase() ?? '?'}
                 </div>
