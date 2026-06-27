@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import {
   CheckCircle, XCircle, TrendingUp, ArrowDownToLine, ArrowUpFromLine,
   Building2, ChevronRight, ArrowLeft, Users, Wallet, PiggyBank,
+  CheckSquare, Square, Sparkles,
 } from 'lucide-react'
 
 type Center = { id: string; name: string; image_url: string | null }
@@ -29,6 +30,13 @@ export default function AdminInvestments() {
   const [selectedCenterId, setSelectedCenterId] = useState<string | null>(null)
   const [profitInputs, setProfitInputs] = useState<Record<string, string>>({})
   const [feedback, setFeedback] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
+  // bulk profit distribution
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [distMode, setDistMode] = useState<'proportional' | 'equal'>('proportional')
+  const [distBase, setDistBase] = useState<'deposits' | 'balance'>('deposits')
+  const [distAmount, setDistAmount] = useState('')
+
+  useEffect(() => { setSelected(new Set()); setDistAmount('') }, [selectedCenterId])
 
   const { data: centers } = useQuery({
     queryKey: ['inv-centers-min'],
@@ -184,7 +192,64 @@ export default function AdminInvestments() {
     addProfit.mutate({ investmentId, amount })
   }
 
+  const distribute = useMutation({
+    mutationFn: async (entries: { investmentId: string; amount: number }[]) => {
+      for (const e of entries) {
+        const { error } = await supabase.rpc('add_investment_profit', { p_investment_id: e.investmentId, p_amount: e.amount, p_note: 'Profit distribution' })
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inv-balances'] })
+      setSelected(new Set()); setDistAmount('')
+      setFeedback({ id: 'distribute', msg: 'Profit distributed to members', ok: true })
+      setTimeout(() => setFeedback(null), 2500)
+    },
+    onError: (e: unknown) => setFeedback({ id: 'distribute', msg: e instanceof Error ? e.message : 'Failed to distribute', ok: false }),
+  })
+
   const nameOf = (id: string) => profilesMap?.get(id) ?? 'Member'
+
+  // ---- bulk distribution helpers ----
+  function toggleMember(id: string) {
+    setSelected((prev) => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id); else n.add(id)
+      return n
+    })
+  }
+  function toggleAll() {
+    setSelected((prev) => prev.size === centerMembers.length ? new Set() : new Set(centerMembers.map((m) => m.investment_id)))
+  }
+  const baseOf = (m: Balance) => (distBase === 'balance' ? Number(m.balance) : Number(m.total_deposits))
+  const selectedMembers = centerMembers.filter((m) => selected.has(m.investment_id))
+  const totalBase = selectedMembers.reduce((s, m) => s + baseOf(m), 0)
+  const distTotal = Number(distAmount) || 0
+  const shares: Record<string, number> = {}
+  if (selectedMembers.length > 0 && distTotal > 0) {
+    const raw = selectedMembers.map((m) => {
+      const amt = distMode === 'equal'
+        ? distTotal / selectedMembers.length
+        : totalBase > 0 ? distTotal * (baseOf(m) / totalBase) : 0
+      return { id: m.investment_id, amt: Math.round(amt * 100) / 100 }
+    })
+    const sum = raw.reduce((s, r) => s + r.amt, 0)
+    const diff = Math.round((distTotal - sum) * 100) / 100
+    if (diff !== 0) {
+      let mi = 0
+      for (let i = 1; i < raw.length; i++) if (raw[i].amt > raw[mi].amt) mi = i
+      raw[mi].amt = Math.round((raw[mi].amt + diff) * 100) / 100
+    }
+    for (const r of raw) shares[r.id] = r.amt
+  }
+  function submitDistribute() {
+    const entries = Object.entries(shares).filter(([, amt]) => amt > 0).map(([investmentId, amount]) => ({ investmentId, amount }))
+    if (entries.length === 0) { setFeedback({ id: 'distribute', msg: 'Select members and enter an amount', ok: false }); return }
+    distribute.mutate(entries)
+  }
+  const sharePct = (m: Balance) => distMode === 'equal'
+    ? (selectedMembers.length ? 100 / selectedMembers.length : 0)
+    : (totalBase > 0 ? (baseOf(m) / totalBase) * 100 : 0)
 
   // =================== CENTER LIST ===================
   if (!selectedCenter) {
@@ -295,10 +360,62 @@ export default function AdminInvestments() {
       <section className="space-y-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-300"><Users size={15} /> Members</h2>
         {centerMembers.length === 0 && <p className="text-sm text-gray-600">No members have joined this center yet.</p>}
-        {centerMembers.map((m) => (
-          <div key={m.investment_id} className="rounded-xl border border-gray-800 bg-[#141414] p-4">
+
+        {/* Distribute profit panel */}
+        {centerMembers.length > 0 && (
+          <div className="rounded-xl border border-violet-500/25 bg-violet-500/5 p-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-sm font-semibold text-gray-100">{nameOf(m.member_id)}</p>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-violet-200"><Sparkles size={15} /> Distribute Profit</h3>
+              <button onClick={toggleAll} className="text-xs text-violet-300 hover:text-violet-200">
+                {selected.size === centerMembers.length ? 'Clear all' : 'Select all'}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">Tick members below, then split a total profit across them.</p>
+
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="relative sm:w-44">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+                <input type="number" min="0" step="0.01" value={distAmount} onChange={(e) => setDistAmount(e.target.value)} placeholder="Total profit" className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 pl-7 pr-3 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+              </div>
+              <div className="inline-flex rounded-lg border border-gray-700 bg-[#0f0f0f] p-0.5 text-xs">
+                <button onClick={() => setDistMode('proportional')} className={`rounded-md px-3 py-1.5 transition ${distMode === 'proportional' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>Proportional</button>
+                <button onClick={() => setDistMode('equal')} className={`rounded-md px-3 py-1.5 transition ${distMode === 'equal' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>Equal</button>
+              </div>
+              {distMode === 'proportional' && (
+                <div className="inline-flex rounded-lg border border-gray-700 bg-[#0f0f0f] p-0.5 text-xs">
+                  <button onClick={() => setDistBase('deposits')} className={`rounded-md px-3 py-1.5 transition ${distBase === 'deposits' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>By Invested</button>
+                  <button onClick={() => setDistBase('balance')} className={`rounded-md px-3 py-1.5 transition ${distBase === 'balance' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>By Balance</button>
+                </div>
+              )}
+            </div>
+
+            {selected.size > 0 && distTotal > 0 && (
+              <div className="mt-3 space-y-1 rounded-lg border border-gray-800 bg-[#0f0f0f] p-3">
+                {selectedMembers.map((m) => (
+                  <div key={m.investment_id} className="flex items-center justify-between text-xs">
+                    <span className="truncate text-gray-400">{nameOf(m.member_id)} <span className="text-gray-600">({sharePct(m).toFixed(1)}%)</span></span>
+                    <span className="shrink-0 font-medium text-green-400">+{fmt(shares[m.investment_id] ?? 0)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button onClick={submitDistribute} disabled={distribute.isPending || selected.size === 0 || distTotal <= 0} className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50 transition-colors">
+              <TrendingUp size={15} /> Distribute to {selected.size} member{selected.size === 1 ? '' : 's'}
+            </button>
+            {feedback?.id === 'distribute' && <p className={feedback.ok ? 'mt-2 text-xs text-green-400' : 'mt-2 text-xs text-red-400'}>{feedback.msg}</p>}
+          </div>
+        )}
+
+        {centerMembers.map((m) => (
+          <div key={m.investment_id} className={`rounded-xl border bg-[#141414] p-4 transition ${selected.has(m.investment_id) ? 'border-violet-500/50' : 'border-gray-800'}`}>
+            <div className="flex items-center justify-between gap-2">
+              <button onClick={() => toggleMember(m.investment_id)} className="flex min-w-0 items-center gap-2 text-left">
+                {selected.has(m.investment_id)
+                  ? <CheckSquare size={16} className="shrink-0 text-violet-400" />
+                  : <Square size={16} className="shrink-0 text-gray-600" />}
+                <span className="truncate text-sm font-semibold text-gray-100">{nameOf(m.member_id)}</span>
+              </button>
               <span className="shrink-0 text-[11px] text-gray-600">Joined {fmtDate(m.created_at)}</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
