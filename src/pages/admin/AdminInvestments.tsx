@@ -384,7 +384,6 @@ export default function AdminInvestments() {
             </div>
             )
           })}
-          ))}
         </section>
       )}
 
