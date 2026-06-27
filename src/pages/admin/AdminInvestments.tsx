@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import {
   CheckCircle, XCircle, TrendingUp, ArrowDownToLine, ArrowUpFromLine,
   Building2, ChevronRight, ArrowLeft, Users, Wallet, PiggyBank,
-  CheckSquare, Square, Sparkles,
+  CheckSquare, Square, Sparkles, Search, X,
 } from 'lucide-react'
 
 type Center = { id: string; name: string; image_url: string | null }
@@ -35,8 +35,9 @@ export default function AdminInvestments() {
   const [distMode, setDistMode] = useState<'proportional' | 'equal'>('proportional')
   const [distBase, setDistBase] = useState<'deposits' | 'balance'>('deposits')
   const [distAmount, setDistAmount] = useState('')
+  const [memberSearch, setMemberSearch] = useState('')
 
-  useEffect(() => { setSelected(new Set()); setDistAmount('') }, [selectedCenterId])
+  useEffect(() => { setSelected(new Set()); setDistAmount(''); setMemberSearch('') }, [selectedCenterId])
 
   const { data: centers } = useQuery({
     queryKey: ['inv-centers-min'],
@@ -210,6 +211,10 @@ export default function AdminInvestments() {
 
   const nameOf = (id: string) => profilesMap?.get(id) ?? 'Member'
 
+  const displayMembers = memberSearch.trim()
+    ? centerMembers.filter((m) => nameOf(m.member_id).toLowerCase().includes(memberSearch.trim().toLowerCase()))
+    : centerMembers
+
   // ---- bulk distribution helpers ----
   function toggleMember(id: string) {
     setSelected((prev) => {
@@ -219,7 +224,13 @@ export default function AdminInvestments() {
     })
   }
   function toggleAll() {
-    setSelected((prev) => prev.size === centerMembers.length ? new Set() : new Set(centerMembers.map((m) => m.investment_id)))
+    setSelected((prev) => {
+      const allShown = displayMembers.every((m) => prev.has(m.investment_id))
+      const n = new Set(prev)
+      if (allShown) { for (const m of displayMembers) n.delete(m.investment_id) }
+      else { for (const m of displayMembers) n.add(m.investment_id) }
+      return n
+    })
   }
   const baseOf = (m: Balance) => (distBase === 'balance' ? Number(m.balance) : Number(m.total_deposits))
   const selectedMembers = centerMembers.filter((m) => selected.has(m.investment_id))
@@ -367,7 +378,7 @@ export default function AdminInvestments() {
             <div className="flex items-center justify-between gap-2">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-violet-200"><Sparkles size={15} /> Distribute Profit</h3>
               <button onClick={toggleAll} className="text-xs text-violet-300 hover:text-violet-200">
-                {selected.size === centerMembers.length ? 'Clear all' : 'Select all'}
+                {displayMembers.length > 0 && displayMembers.every((m) => selected.has(m.investment_id)) ? 'Unselect shown' : 'Select shown'}
               </button>
             </div>
             <p className="mt-1 text-xs text-gray-500">Tick members below, then split a total profit across them.</p>
@@ -389,6 +400,26 @@ export default function AdminInvestments() {
               )}
             </div>
 
+            {selected.size > 0 && (
+              <div className="mt-3 rounded-lg border border-violet-500/20 bg-[#0f0f0f] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-violet-300">Selected ({selected.size})</span>
+                  <button onClick={() => setSelected(new Set())} className="text-[11px] text-gray-400 hover:text-gray-200">Clear all</button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[...selected].map((id) => {
+                    const mm = centerMembers.find((x) => x.investment_id === id)
+                    return (
+                      <span key={id} className="inline-flex items-center gap-1 rounded-full bg-violet-600/20 py-1 pl-2.5 pr-1 text-xs text-violet-200">
+                        {mm ? nameOf(mm.member_id) : 'Member'}
+                        <button onClick={() => toggleMember(id)} className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-violet-500/40" aria-label="Remove"><X size={11} /></button>
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {selected.size > 0 && distTotal > 0 && (
               <div className="mt-3 space-y-1 rounded-lg border border-gray-800 bg-[#0f0f0f] p-3">
                 {selectedMembers.map((m) => (
@@ -407,7 +438,16 @@ export default function AdminInvestments() {
           </div>
         )}
 
-        {centerMembers.map((m) => (
+        {/* Member search */}
+        {centerMembers.length > 0 && (
+          <div className="relative">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+            <input value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} placeholder="Search members in this center" className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 pl-9 pr-3 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+          </div>
+        )}
+        {centerMembers.length > 0 && displayMembers.length === 0 && <p className="text-sm text-gray-600">No members match your search.</p>}
+
+        {displayMembers.map((m) => (
           <div key={m.investment_id} className={`rounded-xl border bg-[#141414] p-4 transition ${selected.has(m.investment_id) ? 'border-violet-500/50' : 'border-gray-800'}`}>
             <div className="flex items-center justify-between gap-2">
               <button onClick={() => toggleMember(m.investment_id)} className="flex min-w-0 items-center gap-2 text-left">
