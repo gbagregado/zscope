@@ -47,6 +47,8 @@ create table if not exists public.profiles (
   role text not null default 'member' check (role in ('admin', 'member')),
   status text not null default 'pending' check (status in ('pending', 'active', 'rejected')),
   terms_accepted_at timestamptz,
+  address text,
+  solana_account text,
   created_at timestamptz not null default now()
 );
 comment on column public.profiles.terms_accepted_at is
@@ -555,13 +557,15 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, full_name, role, status)
+  insert into public.profiles (id, email, full_name, role, status, address, solana_account)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'full_name', 'New Member'),
     'member',
-    'pending'
+    'pending',
+    nullif(btrim(coalesce(new.raw_user_meta_data->>'address', '')), ''),
+    nullif(btrim(coalesce(new.raw_user_meta_data->>'solana_account', '')), '')
   );
   return new;
 end;

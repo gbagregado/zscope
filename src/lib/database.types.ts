@@ -11,10 +11,12 @@ export interface Database {
           role: 'admin' | 'member'
           status: 'pending' | 'active' | 'rejected'
           terms_accepted_at: string | null
+          address: string | null
+          solana_account: string | null
           created_at: string
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at'>
-        Update: { role?: 'admin' | 'member'; status?: 'pending' | 'active' | 'rejected'; full_name?: string; email?: string; terms_accepted_at?: string | null }
+        Update: { role?: 'admin' | 'member'; status?: 'pending' | 'active' | 'rejected'; full_name?: string; email?: string; terms_accepted_at?: string | null; address?: string | null; solana_account?: string | null }
         Relationships: []
       }
       transactions: {
@@ -400,6 +402,10 @@ export interface Database {
       }
       revoke_member: {
         Args: { p_member_id: string; p_mode: string; p_reason: string; p_disbursement_note?: string | null; p_proof_url?: string | null }
+        Returns: undefined
+      }
+      update_my_account_info: {
+        Args: { p_address: string; p_solana_account: string }
         Returns: undefined
       }
     }

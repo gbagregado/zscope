@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { CheckCircle, XCircle, Clock, Users, UserMinus, AlertTriangle, X, Paperclip } from 'lucide-react'
 import clsx from 'clsx'
 
-type Member = { id: string; full_name: string; email: string; role: string; status: 'pending' | 'active' | 'rejected' }
+type Member = { id: string; full_name: string; email: string; role: string; status: 'pending' | 'active' | 'rejected'; address: string | null; solana_account: string | null }
 
 const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
@@ -189,6 +189,7 @@ export default function AdminMembers() {
                       <div>
                         <p className="text-sm font-medium text-gray-200">{m.full_name}</p>
                         <p className="text-xs text-gray-600">{m.email}</p>
+                        {m.solana_account && <p className="mt-0.5 truncate text-[11px] text-gray-600" title={m.solana_account}>◎ {m.solana_account.slice(0, 6)}…{m.solana_account.slice(-4)}</p>}
                       </div>
                     </div>
                   </td>
@@ -248,6 +249,28 @@ export default function AdminMembers() {
               Revoke access for <span className="font-medium text-gray-200">{revokeTarget.full_name}</span>. This closes
               {' '}<span className="font-medium text-gray-200">all {revokeCalc.count} active investment{revokeCalc.count === 1 ? '' : 's'}</span> across every center and returns funds to their wallet.
             </p>
+
+            {/* member account info — where to send the funds */}
+            <div className="mt-3 rounded-xl border border-violet-500/25 bg-violet-500/5 p-3 text-sm">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-violet-300">Member payout details</p>
+              <div className="mt-1.5 space-y-1">
+                <div>
+                  <span className="text-gray-500">Solana account: </span>
+                  {revokeTarget.solana_account
+                    ? <span className="break-all font-medium text-gray-200">{revokeTarget.solana_account}</span>
+                    : <span className="text-gray-500 italic">not provided</span>}
+                </div>
+                <div>
+                  <span className="text-gray-500">Address: </span>
+                  {revokeTarget.address
+                    ? <span className="text-gray-300">{revokeTarget.address}</span>
+                    : <span className="text-gray-500 italic">not provided</span>}
+                </div>
+              </div>
+              {revokeTarget.solana_account && (
+                <button onClick={() => setDisbursementNote(`Solana: ${revokeTarget.solana_account}`)} className="mt-2 text-[11px] text-violet-400 hover:text-violet-300">Use Solana account as disbursement note</button>
+              )}
+            </div>
 
             {/* mode toggle */}
             <div className="mt-4 inline-flex w-full rounded-lg border border-gray-700 bg-[#0f0f0f] p-0.5 text-xs">

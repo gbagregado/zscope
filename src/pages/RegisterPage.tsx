@@ -10,6 +10,11 @@ import logo from '../assets/logo.jpeg'
 const schema = z.object({
   full_name: z.string().min(2, 'Full name must be at least 2 characters'),
   email: z.string().email('Invalid email'),
+  address: z.string().min(5, 'Please enter your full address'),
+  solana_account: z.string()
+    .min(32, 'Solana address looks too short')
+    .max(44, 'Solana address looks too long')
+    .regex(/^[1-9A-HJ-NP-Za-km-z]+$/, 'Not a valid Solana address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirm: z.string(),
 }).refine((d) => d.password === d.confirm, {
@@ -33,7 +38,7 @@ export default function RegisterPage() {
     const { error: signUpError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: { data: { full_name: data.full_name } },
+      options: { data: { full_name: data.full_name, address: data.address, solana_account: data.solana_account } },
     })
     if (signUpError) { setError(signUpError.message); return }
     navigate('/pending')
@@ -116,6 +121,19 @@ export default function RegisterPage() {
               <label className="text-sm font-medium text-gray-300">Email address</label>
               <input {...register('email')} type="email" autoComplete="email" className={inputClass} placeholder="you@example.com" />
               {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">Address</label>
+              <input {...register('address')} type="text" autoComplete="street-address" className={inputClass} placeholder="House no., street, city, province" />
+              {errors.address && <p className="text-xs text-red-400">{errors.address.message}</p>}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">Main Solana account</label>
+              <input {...register('solana_account')} type="text" autoComplete="off" spellCheck={false} className={inputClass} placeholder="Your Solana wallet address" />
+              <p className="text-xs text-gray-500">Used as your default payout account so we always know where to send your funds.</p>
+              {errors.solana_account && <p className="text-xs text-red-400">{errors.solana_account.message}</p>}
             </div>
 
             <div className="flex flex-col gap-2">
