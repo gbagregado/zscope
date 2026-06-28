@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { useConfirm } from '../../components/ConfirmDialog'
-import { Upload, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, ImageIcon, Monitor } from 'lucide-react'
+import { Upload, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, ImageIcon, Monitor, RefreshCw } from 'lucide-react'
 import type { Database } from '../../lib/database.types'
 
 type Ad = Database['public']['Tables']['advertisements']['Row']
@@ -64,6 +64,26 @@ export default function AdminAdvertisements() {
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['advertisements-admin'] }),
+  })
+
+  const replace = useMutation({
+    mutationFn: async ({ ad, newFile }: { ad: Ad; newFile: File }) => {
+      const ext = newFile.name.split('.').pop()
+      const path = `${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('advertisements').upload(path, newFile)
+      if (upErr) throw upErr
+      const { data: urlData } = supabase.storage.from('advertisements').getPublicUrl(path)
+      const { error } = await supabase
+        .from('advertisements')
+        .update({ image_url: urlData.publicUrl, storage_path: path })
+        .eq('id', ad.id)
+      if (error) throw error
+      if (ad.storage_path) {
+        await supabase.storage.from('advertisements').remove([ad.storage_path])
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['advertisements-admin'] }),
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Failed to replace image'),
   })
 
   async function handleUpload() {
@@ -167,6 +187,22 @@ export default function AdminAdvertisements() {
               </p>
             </div>
             <div className="flex items-center gap-1">
+              <label
+                className="cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-white/5 hover:text-gray-300"
+                title="Replace image"
+              >
+                <RefreshCw size={16} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) replace.mutate({ ad, newFile: f })
+                    e.target.value = ''
+                  }}
+                />
+              </label>
               <button
                 onClick={() => togglePopup.mutate({ id: ad.id, show_as_popup: !ad.show_as_popup })}
                 className={ad.show_as_popup ? 'rounded-md p-1.5 text-violet-400 hover:bg-white/5' : 'rounded-md p-1.5 text-gray-600 hover:bg-white/5 hover:text-gray-300'}
