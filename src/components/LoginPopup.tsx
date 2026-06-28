@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
-import { X, Megaphone } from 'lucide-react'
+import { X, Megaphone, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type PopupAnnouncement = {
   id: string
@@ -25,11 +25,11 @@ export default function LoginPopup() {
   const [adDismissed, setAdDismissed] = useState(false)
   const [annDismissed, setAnnDismissed] = useState(false)
 
-  const { data: ad } = useQuery({
+  const { data: ads } = useQuery({
     queryKey: ['login-popup-ad'],
     enabled: !!profile?.id,
     staleTime: 5 * 60_000,
-    queryFn: async (): Promise<PopupAd | null> => {
+    queryFn: async (): Promise<PopupAd[]> => {
       const { data, error } = await supabase
         .from('advertisements')
         .select('id, image_url')
@@ -37,10 +37,8 @@ export default function LoginPopup() {
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
       if (error) throw error
-      return data
+      return data ?? []
     },
   })
 
@@ -61,8 +59,10 @@ export default function LoginPopup() {
     },
   })
 
-  const adKey = ad ? `zscope-popup-seen:ad:${ad.id}` : null
+  const adKey = ads && ads.length ? `zscope-popup-seen:ad:${ads.map((a) => a.id).join(',')}` : null
   const annKey = announcement ? `zscope-popup-seen:${announcement.id}` : null
+
+  const [slide, setSlide] = useState(0)
 
   useEffect(() => {
     if (adKey && sessionStorage.getItem(adKey)) setAdDismissed(true)
@@ -81,23 +81,71 @@ export default function LoginPopup() {
   }
 
   // Ad shows first; only after it's gone do we show the announcement.
-  const showAd = !!ad && !adDismissed
+  const showAd = !!ads && ads.length > 0 && !adDismissed
   const showAnn = !showAd && !!announcement && !annDismissed
 
-  if (showAd) {
+  // Auto-rotate the ad carousel every 4s while it's visible.
+  useEffect(() => {
+    if (!showAd || !ads || ads.length < 2) return
+    const t = setInterval(() => setSlide((s) => (s + 1) % ads.length), 4000)
+    return () => clearInterval(t)
+  }, [showAd, ads])
+
+  if (showAd && ads) {
+    const count = ads.length
+    const current = slide % count
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeAd} aria-hidden />
-        <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-gray-800 bg-[#141414] shadow-2xl">
+        <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-gray-800 bg-[#141414] shadow-2xl">
           <button
             onClick={closeAd}
             aria-label="Close"
-            className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-gray-300 hover:bg-black/60 hover:text-white transition"
+            className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-gray-200 hover:bg-black/70 hover:text-white transition"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
-          <img src={ad!.image_url} alt="Advertisement" className="w-full object-contain" />
+
+          <div className="relative">
+            <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${current * 100}%)` }}>
+              {ads.map((a) => (
+                <img key={a.id} src={a.image_url} alt="Advertisement" className="w-full shrink-0 object-contain" />
+              ))}
+            </div>
+
+            {count > 1 && (
+              <>
+                <button
+                  onClick={() => setSlide((s) => (s - 1 + count) % count)}
+                  aria-label="Previous"
+                  className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-gray-200 hover:bg-black/70 hover:text-white transition"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  onClick={() => setSlide((s) => (s + 1) % count)}
+                  aria-label="Next"
+                  className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-gray-200 hover:bg-black/70 hover:text-white transition"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </>
+            )}
+          </div>
+
           <div className="p-4">
+            {count > 1 && (
+              <div className="mb-3 flex items-center justify-center gap-1.5">
+                {ads.map((a, i) => (
+                  <button
+                    key={a.id}
+                    onClick={() => setSlide(i)}
+                    aria-label={`Go to slide ${i + 1}`}
+                    className={i === current ? 'h-1.5 w-5 rounded-full bg-violet-500 transition-all' : 'h-1.5 w-1.5 rounded-full bg-gray-600 transition-all hover:bg-gray-500'}
+                  />
+                ))}
+              </div>
+            )}
             <button
               onClick={closeAd}
               className="w-full rounded-lg bg-violet-600 py-2.5 text-sm font-medium text-white hover:bg-violet-500 transition"
@@ -115,7 +163,7 @@ export default function LoginPopup() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeAnn} aria-hidden />
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-gray-800 bg-[#141414] shadow-2xl">
+      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-gray-800 bg-[#141414] shadow-2xl">
         <button
           onClick={closeAnn}
           aria-label="Close"
@@ -125,7 +173,7 @@ export default function LoginPopup() {
         </button>
 
         {announcement!.image_url && (
-          <img src={announcement!.image_url} alt={announcement!.title} className="max-h-60 w-full object-cover" />
+          <img src={announcement!.image_url} alt={announcement!.title} className="max-h-72 w-full object-cover" />
         )}
 
         <div className="p-5">
