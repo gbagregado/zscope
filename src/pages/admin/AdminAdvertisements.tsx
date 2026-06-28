@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { useConfirm } from '../../components/ConfirmDialog'
-import { Upload, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, ImageIcon } from 'lucide-react'
+import { Upload, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, ImageIcon, Monitor } from 'lucide-react'
 import type { Database } from '../../lib/database.types'
 
 type Ad = Database['public']['Tables']['advertisements']['Row']
@@ -32,6 +32,14 @@ export default function AdminAdvertisements() {
   const toggle = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await supabase.from('advertisements').update({ is_active }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['advertisements-admin'] }),
+  })
+
+  const togglePopup = useMutation({
+    mutationFn: async ({ id, show_as_popup }: { id: string; show_as_popup: boolean }) => {
+      const { error } = await supabase.from('advertisements').update({ show_as_popup }).eq('id', id)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['advertisements-admin'] }),
@@ -106,7 +114,7 @@ export default function AdminAdvertisements() {
       <div>
         <h1 className="text-xl font-semibold text-gray-100">Advertisements</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Upload banner images that rotate on the member dashboard. Drag order with the arrows; hide any banner without deleting it.
+          Upload banner images that rotate on the member dashboard. Drag order with the arrows; hide any banner without deleting it. Use the monitor icon to show a banner as a login pop-up.
         </p>
       </div>
 
@@ -155,9 +163,17 @@ export default function AdminAdvertisements() {
               <p className="text-sm text-gray-300">Banner #{i + 1}</p>
               <p className="text-xs text-gray-600">
                 {ad.is_active ? 'Visible to members' : 'Hidden'}
+                {ad.show_as_popup && <span className="ml-2 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-300">Login pop-up</span>}
               </p>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => togglePopup.mutate({ id: ad.id, show_as_popup: !ad.show_as_popup })}
+                className={ad.show_as_popup ? 'rounded-md p-1.5 text-violet-400 hover:bg-white/5' : 'rounded-md p-1.5 text-gray-600 hover:bg-white/5 hover:text-gray-300'}
+                title={ad.show_as_popup ? 'Stop showing as login pop-up' : 'Show as login pop-up'}
+              >
+                <Monitor size={16} />
+              </button>
               <button
                 onClick={() => move(i, -1)}
                 disabled={i === 0}

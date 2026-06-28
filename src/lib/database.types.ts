@@ -142,6 +142,7 @@ export interface Database {
           storage_path: string | null
           sort_order: number
           is_active: boolean
+          show_as_popup: boolean
           created_by: string | null
           created_at: string
         }
@@ -150,6 +151,7 @@ export interface Database {
           storage_path?: string | null
           sort_order?: number
           is_active?: boolean
+          show_as_popup?: boolean
           created_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['advertisements']['Insert']>

@@ -133,9 +133,12 @@ create table if not exists public.advertisements (
   storage_path text,
   sort_order int not null default 0,
   is_active boolean not null default true,
+  show_as_popup boolean not null default false,
   created_by uuid references public.profiles(id),
   created_at timestamptz not null default now()
 );
+comment on column public.advertisements.show_as_popup is
+  'When true (and is_active), this banner shows as a login pop-up once per session.';
 
 
 -- ============================================================
