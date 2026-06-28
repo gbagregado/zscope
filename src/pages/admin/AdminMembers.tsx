@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { CheckCircle, XCircle, Clock, Users, UserMinus, AlertTriangle, X, Paperclip } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Users, UserMinus, AlertTriangle, X, Paperclip, Wallet, Plus, Minus } from 'lucide-react'
 import clsx from 'clsx'
 
 type Member = { id: string; full_name: string; email: string; role: string; status: 'pending' | 'active' | 'rejected'; address: string | null; payout_network: string | null; wallet_address: string | null }
@@ -16,6 +16,12 @@ export default function AdminMembers() {
   const [revokeError, setRevokeError] = useState<string | null>(null)
   const [disbursementNote, setDisbursementNote] = useState('')
   const [proofFile, setProofFile] = useState<File | null>(null)
+  // manual balance adjustment
+  const [adjustTarget, setAdjustTarget] = useState<Member | null>(null)
+  const [adjustDir, setAdjustDir] = useState<'credit' | 'debit'>('credit')
+  const [adjustAmount, setAdjustAmount] = useState('')
+  const [adjustReason, setAdjustReason] = useState('')
+  const [adjustError, setAdjustError] = useState<string | null>(null)
 
   const { data: members, isLoading } = useQuery({
     queryKey: ['admin-members'],
@@ -36,6 +42,56 @@ export default function AdminMembers() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-members'] }),
   })
+
+  // current wallet balance of the member being adjusted
+  const { data: adjustBalance } = useQuery({
+    queryKey: ['member-balance', adjustTarget?.id],
+    enabled: !!adjustTarget,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('member_balances')
+        .select('balance')
+        .eq('member_id', adjustTarget!.id)
+        .maybeSingle()
+      if (error) throw error
+      return Number(data?.balance ?? 0)
+    },
+  })
+
+  const adjustMember = useMutation({
+    mutationFn: async ({ memberId, direction, amount, reason }: { memberId: string; direction: 'credit' | 'debit'; amount: number; reason: string }) => {
+      const { error } = await supabase.rpc('admin_adjust_balance', {
+        p_member_id: memberId, p_direction: direction, p_amount: amount, p_reason: reason,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-members'] })
+      qc.invalidateQueries({ queryKey: ['member-balance'] })
+      setAdjustTarget(null); setAdjustAmount(''); setAdjustReason(''); setAdjustError(null)
+    },
+    onError: (e: unknown) => setAdjustError(e instanceof Error ? e.message : 'Failed to adjust balance'),
+  })
+
+  function openAdjust(m: Member) {
+    setAdjustTarget(m)
+    setAdjustDir('credit')
+    setAdjustAmount('')
+    setAdjustReason('')
+    setAdjustError(null)
+  }
+
+  function confirmAdjust() {
+    if (!adjustTarget) return
+    const amt = Number(adjustAmount)
+    if (!Number.isFinite(amt) || amt <= 0) { setAdjustError('Enter an amount greater than zero.'); return }
+    if (adjustReason.trim() === '') { setAdjustError('Please enter a reason.'); return }
+    if (adjustDir === 'debit' && adjustBalance != null && amt > adjustBalance) {
+      setAdjustError(`Cannot debit more than the available balance (${fmt(adjustBalance)}).`); return
+    }
+    setAdjustError(null)
+    adjustMember.mutate({ memberId: adjustTarget.id, direction: adjustDir, amount: amt, reason: adjustReason.trim() })
+  }
 
   // active investment positions of the member being revoked (for the preview)
   const { data: revokeInvestments } = useQuery({
@@ -213,22 +269,32 @@ export default function AdminMembers() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {m.status === 'active' && (
-                      <button
-                        onClick={() => openRevoke(m as Member)}
-                        className="flex items-center gap-1.5 rounded-lg bg-white/4 px-2.5 py-1 text-xs text-gray-500 hover:text-red-400 transition"
-                      >
-                        <UserMinus size={12} /> Revoke
-                      </button>
-                    )}
-                    {m.status === 'rejected' && (
-                      <button
-                        onClick={() => updateStatus.mutate({ id: m.id, status: 'active' })}
-                        className="rounded-lg bg-white/4 px-2.5 py-1 text-xs text-gray-500 hover:text-green-400 transition"
-                      >
-                        Restore
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {m.role !== 'admin' && (
+                        <button
+                          onClick={() => openAdjust(m as Member)}
+                          className="flex items-center gap-1.5 rounded-lg bg-white/4 px-2.5 py-1 text-xs text-gray-500 hover:text-violet-400 transition"
+                        >
+                          <Wallet size={12} /> Adjust
+                        </button>
+                      )}
+                      {m.status === 'active' && (
+                        <button
+                          onClick={() => openRevoke(m as Member)}
+                          className="flex items-center gap-1.5 rounded-lg bg-white/4 px-2.5 py-1 text-xs text-gray-500 hover:text-red-400 transition"
+                        >
+                          <UserMinus size={12} /> Revoke
+                        </button>
+                      )}
+                      {m.status === 'rejected' && (
+                        <button
+                          onClick={() => updateStatus.mutate({ id: m.id, status: 'active' })}
+                          className="rounded-lg bg-white/4 px-2.5 py-1 text-xs text-gray-500 hover:text-green-400 transition"
+                        >
+                          Restore
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -326,6 +392,59 @@ export default function AdminMembers() {
               </button>
             </div>
             <p className="mt-2 text-center text-[11px] text-gray-600">Each closed position is logged and can be undone per-investment from its center if you restore the member.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Manual balance adjustment modal */}
+      {adjustTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { if (!adjustMember.isPending) setAdjustTarget(null) }}>
+          <div className="w-full max-w-sm rounded-2xl border border-gray-800 bg-[#141414] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-gray-100"><Wallet size={18} className="text-violet-400" /> Adjust balance</h3>
+              <button onClick={() => { if (!adjustMember.isPending) setAdjustTarget(null) }} className="text-gray-500 hover:text-gray-300"><X size={18} /></button>
+            </div>
+            <p className="mt-1 text-sm text-gray-400">
+              Manually credit or debit <span className="font-medium text-gray-200">{adjustTarget.full_name}</span>'s wallet. This is recorded in their transaction history.
+            </p>
+
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-800 bg-[#0f0f0f] px-3 py-2.5 text-sm">
+              <span className="text-gray-500">Current balance</span>
+              <span className="font-semibold text-gray-100">{adjustBalance == null ? '…' : fmt(adjustBalance)}</span>
+            </div>
+
+            {/* direction toggle */}
+            <div className="mt-4 inline-flex w-full rounded-lg border border-gray-700 bg-[#0f0f0f] p-0.5 text-xs">
+              <button onClick={() => setAdjustDir('credit')} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 transition ${adjustDir === 'credit' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}><Plus size={13} /> Credit (add)</button>
+              <button onClick={() => setAdjustDir('debit')} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 transition ${adjustDir === 'debit' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}><Minus size={13} /> Debit (deduct)</button>
+            </div>
+
+            {/* amount */}
+            <div className="mt-4">
+              <label className="text-xs font-medium text-gray-400">Amount ($)</label>
+              <input type="number" min="0" step="0.01" value={adjustAmount} onChange={(e) => setAdjustAmount(e.target.value)} placeholder="0.00" className="mt-1 w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+              {adjustDir === 'debit' && adjustBalance != null && Number(adjustAmount) > 0 && (
+                <p className="mt-1 text-[11px] text-gray-500">New balance: {fmt(Math.max(0, adjustBalance - Number(adjustAmount)))}</p>
+              )}
+              {adjustDir === 'credit' && adjustBalance != null && Number(adjustAmount) > 0 && (
+                <p className="mt-1 text-[11px] text-gray-500">New balance: {fmt(adjustBalance + Number(adjustAmount))}</p>
+              )}
+            </div>
+
+            {/* reason */}
+            <div className="mt-3">
+              <label className="text-xs font-medium text-gray-400">Reason (required, kept for audit)</label>
+              <textarea value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} rows={2} placeholder="e.g. Correction / bonus / chargeback" className="mt-1 w-full resize-none rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+            </div>
+
+            {adjustError && <p className="mt-2 flex items-center gap-1 text-xs text-red-400"><AlertTriangle size={12} /> {adjustError}</p>}
+
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => { if (!adjustMember.isPending) setAdjustTarget(null) }} className="flex-1 rounded-lg border border-gray-700 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition">Cancel</button>
+              <button onClick={confirmAdjust} disabled={adjustMember.isPending} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 transition ${adjustDir === 'credit' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}`}>
+                {adjustMember.isPending ? 'Saving…' : `${adjustDir === 'credit' ? 'Credit' : 'Debit'} ${adjustAmount ? fmt(Number(adjustAmount) || 0) : ''}`}
+              </button>
+            </div>
           </div>
         </div>
       )}

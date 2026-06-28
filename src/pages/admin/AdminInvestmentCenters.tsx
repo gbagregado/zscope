@@ -19,7 +19,10 @@ const schema = z.object({
   maintaining_balance: z.number().min(0),
   fund_cap: z.number().min(0),
   max_per_member: z.number().min(0),
+  lock_in_mode: z.enum(['none', 'duration', 'date']),
   lock_in_months: z.number().int().min(0),
+  lock_in_days: z.number().int().min(0),
+  lock_in_until: z.string().optional(),
 })
 type FormData = z.infer<typeof schema>
 
@@ -45,10 +48,11 @@ export default function AdminInvestmentCenters() {
     },
   })
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0, lock_in_months: 0 },
+    defaultValues: { expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0, lock_in_mode: 'none', lock_in_months: 0, lock_in_days: 0, lock_in_until: '' },
   })
+  const lockMode = watch('lock_in_mode')
 
   const save = useMutation({
     mutationFn: async (data: FormData & { image_url?: string | null; storage_path?: string | null }) => {
@@ -62,6 +66,8 @@ export default function AdminInvestmentCenters() {
           fund_cap: data.fund_cap,
           max_per_member: data.max_per_member,
           lock_in_months: data.lock_in_months,
+          lock_in_days: data.lock_in_days,
+          lock_in_until: data.lock_in_until || null,
         }
         if (data.image_url || data.storage_path) {
           patch.image_url = data.image_url ?? null
@@ -79,6 +85,8 @@ export default function AdminInvestmentCenters() {
           fund_cap: data.fund_cap,
           max_per_member: data.max_per_member,
           lock_in_months: data.lock_in_months,
+          lock_in_days: data.lock_in_days,
+          lock_in_until: data.lock_in_until || null,
           image_url: data.image_url ?? null,
           storage_path: data.storage_path ?? null,
           created_by: profile!.id,
@@ -109,11 +117,24 @@ export default function AdminInvestmentCenters() {
 
   const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
+  function lockInLabel(c: Center): string {
+    if (c.lock_in_until) {
+      return `Until ${new Date(c.lock_in_until + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`
+    }
+    const months = c.lock_in_months || 0
+    const days = c.lock_in_days ?? 0
+    if (months <= 0 && days <= 0) return 'None'
+    const parts: string[] = []
+    if (months > 0) parts.push(`${months} month${months > 1 ? 's' : ''}`)
+    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`)
+    return parts.join(' ')
+  }
+
   function openNew() {
     setEditing(null)
     setImage(null)
     setError('')
-    reset({ name: '', description: '', expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0, lock_in_months: 0 })
+    reset({ name: '', description: '', expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0, lock_in_mode: 'none', lock_in_months: 0, lock_in_days: 0, lock_in_until: '' })
     setShowForm(true)
   }
 
@@ -129,7 +150,10 @@ export default function AdminInvestmentCenters() {
       maintaining_balance: c.maintaining_balance,
       fund_cap: c.fund_cap,
       max_per_member: c.max_per_member,
+      lock_in_mode: c.lock_in_until ? 'date' : (c.lock_in_months > 0 || c.lock_in_days > 0 ? 'duration' : 'none'),
       lock_in_months: c.lock_in_months,
+      lock_in_days: c.lock_in_days ?? 0,
+      lock_in_until: c.lock_in_until ?? '',
     })
     setShowForm(true)
   }
@@ -139,11 +163,21 @@ export default function AdminInvestmentCenters() {
     setEditing(null)
     setImage(null)
     setError('')
-    reset({ name: '', description: '', expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0, lock_in_months: 0 })
+    reset({ name: '', description: '', expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0, lock_in_mode: 'none', lock_in_months: 0, lock_in_days: 0, lock_in_until: '' })
   }
 
   async function onSubmit(data: FormData) {
     setError('')
+    // normalize lock-in based on the chosen mode
+    let lock_in_months = 0, lock_in_days = 0
+    let lock_in_until: string | null = null
+    if (data.lock_in_mode === 'duration') {
+      lock_in_months = data.lock_in_months || 0
+      lock_in_days = data.lock_in_days || 0
+    } else if (data.lock_in_mode === 'date') {
+      if (!data.lock_in_until) { setError('Please choose a lock-in end date.'); return }
+      lock_in_until = data.lock_in_until
+    }
     let image_url: string | null = null
     let storage_path: string | null = null
     if (image) {
@@ -157,7 +191,7 @@ export default function AdminInvestmentCenters() {
       image_url = urlData.publicUrl
       storage_path = path
     }
-    save.mutate({ ...data, image_url, storage_path })
+    save.mutate({ ...data, lock_in_months, lock_in_days, lock_in_until: lock_in_until ?? '', image_url, storage_path })
   }
 
   if (isLoading) return <div className="text-gray-500 text-sm">Loading…</div>
@@ -209,9 +243,41 @@ export default function AdminInvestmentCenters() {
             <label className="mb-1 block text-xs text-gray-500">Max Per Member ($) <span className="text-gray-600">— cap per single member; 0 = unlimited</span></label>
             <input type="number" step="0.01" {...register('max_per_member', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Lock-in Period (months) <span className="text-gray-600">— no adding or withdrawing during lock-in; 0 = none</span></label>
-            <input type="number" step="1" min="0" {...register('lock_in_months', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
+          <div className="rounded-lg border border-gray-800 bg-[#0f0f0f] p-3">
+            <label className="mb-1.5 block text-xs font-medium text-gray-400">Lock-in Period <span className="text-gray-600">— no adding or withdrawing while locked</span></label>
+            <div className="inline-flex w-full rounded-lg border border-gray-700 bg-[#141414] p-0.5 text-xs">
+              <label className={`flex flex-1 cursor-pointer items-center justify-center rounded-md px-2 py-1.5 transition ${lockMode === 'none' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                <input type="radio" value="none" {...register('lock_in_mode')} className="hidden" /> No lock-in
+              </label>
+              <label className={`flex flex-1 cursor-pointer items-center justify-center rounded-md px-2 py-1.5 transition ${lockMode === 'duration' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                <input type="radio" value="duration" {...register('lock_in_mode')} className="hidden" /> Duration
+              </label>
+              <label className={`flex flex-1 cursor-pointer items-center justify-center rounded-md px-2 py-1.5 transition ${lockMode === 'date' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                <input type="radio" value="date" {...register('lock_in_mode')} className="hidden" /> Fixed end date
+              </label>
+            </div>
+
+            {lockMode === 'duration' && (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-[11px] text-gray-500">Months</label>
+                  <input type="number" step="1" min="0" {...register('lock_in_months', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#141414] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-gray-500">Days</label>
+                  <input type="number" step="1" min="0" {...register('lock_in_days', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#141414] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
+                </div>
+                <p className="col-span-2 text-[11px] text-gray-600">Counted from each member's join date. Months and days add together.</p>
+              </div>
+            )}
+
+            {lockMode === 'date' && (
+              <div className="mt-3">
+                <label className="mb-1 block text-[11px] text-gray-500">Locked until (calendar date)</label>
+                <input type="date" {...register('lock_in_until')} className="w-full rounded-lg border border-gray-700 bg-[#141414] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
+                <p className="mt-1 text-[11px] text-gray-600">Same end date for every member, regardless of when they joined.</p>
+              </div>
+            )}
           </div>
           <div>
             <label className="mb-1.5 block text-xs text-gray-500">Image <span className="text-gray-600">(optional{editing ? ' — leave empty to keep current' : ''})</span></label>
@@ -274,7 +340,7 @@ export default function AdminInvestmentCenters() {
                 <p className="mt-1.5 text-[11px] text-gray-600">Maintaining balance: {fmt(c.maintaining_balance)}</p>
                 <p className="mt-0.5 text-[11px] text-gray-600">Fund cap: {c.fund_cap > 0 ? fmt(c.fund_cap) : 'Unlimited'}</p>
                 <p className="mt-0.5 text-[11px] text-gray-600">Max per member: {c.max_per_member > 0 ? fmt(c.max_per_member) : 'Unlimited'}</p>
-                <p className="mt-0.5 text-[11px] text-gray-600">Lock-in: {c.lock_in_months > 0 ? `${c.lock_in_months} month${c.lock_in_months > 1 ? 's' : ''}` : 'None'}</p>
+                <p className="mt-0.5 text-[11px] text-gray-600">Lock-in: {lockInLabel(c)}</p>
 
                 {/* Actions */}
                 <div className="mt-3 flex flex-wrap gap-2">

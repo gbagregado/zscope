@@ -174,6 +174,8 @@ export interface Database {
           fund_cap: number
           max_per_member: number
           lock_in_months: number
+          lock_in_days: number
+          lock_in_until: string | null
           is_active: boolean
           created_by: string | null
           created_at: string
@@ -189,6 +191,8 @@ export interface Database {
           fund_cap?: number
           max_per_member?: number
           lock_in_months?: number
+          lock_in_days?: number
+          lock_in_until?: string | null
           is_active?: boolean
           created_by?: string | null
         }
@@ -408,6 +412,10 @@ export interface Database {
       }
       update_my_account_info: {
         Args: { p_address: string; p_payout_network: string; p_wallet_address: string }
+        Returns: undefined
+      }
+      admin_adjust_balance: {
+        Args: { p_member_id: string; p_direction: string; p_amount: number; p_reason: string }
         Returns: undefined
       }
     }
