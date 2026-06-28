@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import logo from '../assets/logo.jpeg'
+import LoginPopup from '../components/LoginPopup'
 
 const nav = [
   { to: '/dashboard', label: 'Dashboard', icon: Home, end: true },
@@ -106,7 +107,6 @@ export default function MemberLayout() {
         <main className="flex-1 overflow-auto p-4 pb-24 md:p-6 md:pb-6">
           <Outlet />
         </main>
-
         {/* Mobile bottom nav */}
         <nav className="flex md:hidden fixed bottom-0 inset-x-0 border-t border-white/6 bg-[#111111]">
           {nav.map(({ to, label, icon: Icon, end }) => (
@@ -128,6 +128,8 @@ export default function MemberLayout() {
           ))}
         </nav>
       </div>
+
+      <LoginPopup />
     </div>
   )
 }

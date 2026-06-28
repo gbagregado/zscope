@@ -11,6 +11,7 @@ import { Plus, Trash2, Upload, Image as ImageIcon } from 'lucide-react'
 const schema = z.object({
   title: z.string().min(1, 'Required'),
   body: z.string().min(1, 'Required'),
+  show_as_popup: z.boolean(),
 })
 type FormData = z.infer<typeof schema>
 
@@ -34,6 +35,7 @@ export default function AdminAnnouncements() {
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { show_as_popup: false },
   })
 
   const add = useMutation({
@@ -41,7 +43,7 @@ export default function AdminAnnouncements() {
       const { error } = await supabase.from('announcements').insert({ ...data, created_by: profile!.id })
       if (error) throw error
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['announcements'] }); reset(); setShowForm(false); setImage(null); setError('') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['announcements'] }); reset({ title: '', body: '', show_as_popup: false }); setShowForm(false); setImage(null); setError('') },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Failed to post announcement'),
   })
 
@@ -107,8 +109,7 @@ export default function AdminAnnouncements() {
             {errors.body && <p className="mt-1 text-xs text-red-400">{errors.body.message}</p>}
           </div>
           <div>
-            <label className="mb-1.5 block text-xs text-gray-500">Image <span className="text-gray-600">(optional)</span></label>
-            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-gray-700 bg-[#0f0f0f] p-3 transition hover:border-violet-500/60 hover:bg-violet-500/5">
+            <label className="mb-1.5 block text-xs text-gray-500">Image <span className="text-gray-600">(optional)</span></label>            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-gray-700 bg-[#0f0f0f] p-3 transition hover:border-violet-500/60 hover:bg-violet-500/5">
               {image ? (
                 <img src={URL.createObjectURL(image)} alt="preview" className="h-16 w-28 rounded-lg border border-gray-700 object-cover" />
               ) : (
@@ -123,6 +124,13 @@ export default function AdminAnnouncements() {
               <input type="file" accept="image/*" onChange={(e) => setImage(e.target.files?.[0] ?? null)} className="hidden" />
             </label>
           </div>
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-gray-700 bg-[#0f0f0f] p-3">
+            <input type="checkbox" {...register('show_as_popup')} className="mt-0.5 h-4 w-4 shrink-0 accent-violet-600" />
+            <span className="text-xs text-gray-300">
+              Show as login pop-up
+              <span className="mt-0.5 block text-[11px] text-gray-600">Members see this once after they log in. Only the most recent pop-up announcement is shown.</span>
+            </span>
+          </label>
           <button type="submit" disabled={isSubmitting || uploading} className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white hover:bg-violet-500 disabled:opacity-50 transition-colors">
             {isSubmitting || uploading ? 'Posting…' : 'Post'}
           </button>
@@ -134,7 +142,12 @@ export default function AdminAnnouncements() {
           <div key={a.id} className="rounded-xl border border-gray-800 bg-[#141414] p-4">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-200">{a.title}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium text-gray-200">{a.title}</p>
+                  {a.show_as_popup && (
+                    <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-300">Login pop-up</span>
+                  )}
+                </div>
                 <p className="mt-1 text-sm text-gray-400">{a.body}</p>
                 {a.image_url && (
                   <img src={a.image_url} alt={a.title} className="mt-3 max-h-48 w-full rounded-lg border border-gray-800 object-cover" />

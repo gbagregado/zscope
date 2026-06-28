@@ -116,9 +116,12 @@ create table if not exists public.announcements (
   body text not null,
   image_url text null,
   storage_path text null,
+  show_as_popup boolean not null default false,
   created_by uuid not null references public.profiles(id),
   created_at timestamptz not null default now()
 );
+comment on column public.announcements.show_as_popup is
+  'When true, this announcement is shown as a pop-up to members after login (latest one wins).';
 
 -- 1.7 ADVERTISEMENTS (admin image carousel)
 create table if not exists public.advertisements (

@@ -119,6 +119,7 @@ export interface Database {
           body: string
           image_url: string | null
           storage_path: string | null
+          show_as_popup: boolean
           created_by: string
           created_at: string
         }
@@ -127,6 +128,7 @@ export interface Database {
           body: string
           image_url?: string | null
           storage_path?: string | null
+          show_as_popup?: boolean
           created_by: string
         }
         Update: Partial<Database['public']['Tables']['announcements']['Insert']>
