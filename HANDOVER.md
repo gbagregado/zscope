@@ -45,6 +45,8 @@ Read in [src/lib/supabase.ts](src/lib/supabase.ts). The anon key is safe to expo
      including the latest features (manual balance adjustment,
      flexible lock-in, per-member caps, revoke, payout details).
    - It is idempotent and safe to re-run.
+   - **Skip this step if you are doing a FULL DATA MIGRATION** (section 2A) —
+     the database dump already recreates the entire schema.
 4. Create the **admin account**:
    - Register through the app (or Dashboard → Authentication → Add user, with Auto Confirm).
    - Then run, with the admin's email:
@@ -60,11 +62,85 @@ Read in [src/lib/supabase.ts](src/lib/supabase.ts). The anon key is safe to expo
    - Confirm email confirmations match how you want signups to behave.
 6. Copy the project's **URL** and **anon key** (Settings → API) — needed for step 3 and `.env`.
 
-> **Data migration (optional):** to carry over existing members/transactions,
-> export the old project's tables (Dashboard → Database, or `pg_dump`) and import
-> into the new one *after* `setup.sql`. Most handovers start fresh — confirm with the client.
+---
+
+## 2A. Full data migration (carry over ALL existing data + logins)
+
+Use this when you must move existing members, balances, transactions, **and keep
+members' existing passwords/logins**. This produces an exact clone of the old
+database, so **do NOT run `setup.sql` on the new project** — the dump recreates
+the whole schema. Based on Supabase's official
+[Backup & restore guide](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore).
+
+### Prerequisites
+```bash
+# Supabase CLI + Postgres client (psql)
+brew install supabase/tap/supabase
+brew install postgresql@16     # provides psql
+```
+
+Get both projects' **connection strings** from
+Dashboard → **Connect** → *Session pooler* (replace `[YOUR-PASSWORD]` with the
+project's database password from Settings → Database):
+
+```bash
+OLD="postgresql://postgres.OLDREF:[OLD_DB_PW]@aws-0-REGION.pooler.supabase.com:5432/postgres"
+NEW="postgresql://postgres.NEWREF:[NEW_DB_PW]@aws-0-REGION.pooler.supabase.com:5432/postgres"
+```
+
+### Step 1 — Back up the OLD database (3 files)
+```bash
+supabase db dump --db-url "$OLD" -f roles.sql  --role-only
+supabase db dump --db-url "$OLD" -f schema.sql
+supabase db dump --db-url "$OLD" -f data.sql   --use-copy --data-only \
+  -x "storage.buckets_vectors" -x "storage.vector_indexes"
+```
+
+### Step 2 — Restore into the NEW (empty) project
+```bash
+psql \
+  --single-transaction \
+  --variable ON_ERROR_STOP=1 \
+  --file roles.sql \
+  --file schema.sql \
+  --command 'SET session_replication_role = replica' \
+  --file data.sql \
+  --dbname "$NEW"
+```
+- `session_replication_role = replica` **disables triggers during load** — this is
+  what stops the `handle_new_user` trigger from double-creating profile rows and
+  preserves member password hashes intact.
+- If `roles.sql` errors on `cli_login_postgres` / `supabase_admin`, comment out the
+  offending `GRANT ... / ALTER ... OWNER TO "supabase_admin"` lines and re-run (see
+  the guide's Troubleshooting notes). The data restore is what matters.
+
+### Step 3 — Migrate storage FILES (images, proofs, QR codes)
+The database dump carries **bucket definitions and file metadata** but **not the
+actual file bytes** (those live in object storage). Run the included script with
+the **service_role** keys (Settings → API) of both projects:
+
+```bash
+npm install   # ensures @supabase/supabase-js is present
+OLD_PROJECT_URL=https://OLDREF.supabase.co \
+OLD_SERVICE_KEY=OLD_SERVICE_ROLE_KEY \
+NEW_PROJECT_URL=https://NEWREF.supabase.co \
+NEW_SERVICE_KEY=NEW_SERVICE_ROLE_KEY \
+node scripts/migrate-storage.mjs
+```
+Script: [scripts/migrate-storage.mjs](scripts/migrate-storage.mjs). It copies every
+file in every bucket (downloads from old, uploads to new). **Never commit these
+service_role keys** — they bypass RLS.
+
+### Step 4 — Finish
+- Set the new project's **Site URL / Redirect URLs** to the new Cloudflare domain.
+- Re-enable any **Realtime publications** you used (Database → Publications).
+- Run the **smoke test** in section 5 (log in as an existing member to confirm the
+  old password still works).
+
+> Members log in exactly as before — no password reset needed.
 
 ---
+
 
 ## 3. Cloudflare Pages (new account)
 
