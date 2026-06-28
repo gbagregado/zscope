@@ -8,12 +8,12 @@ import { CheckCircle, AlertCircle, MapPin, Wallet } from 'lucide-react'
 
 const schema = z.object({
   address: z.string().min(5, 'Please enter your full address'),
-  solana_account: z.string()
-    .min(32, 'Solana address looks too short')
-    .max(44, 'Solana address looks too long')
-    .regex(/^[1-9A-HJ-NP-Za-km-z]+$/, 'Not a valid Solana address'),
+  payout_network: z.string().min(1, 'Please select a network'),
+  wallet_address: z.string().min(20, 'Wallet address looks too short').max(120, 'Wallet address looks too long'),
 })
 type FormData = z.infer<typeof schema>
+
+const NETWORKS = ['Solana', 'Ethereum (ERC-20)', 'BNB Smart Chain (BEP-20)', 'Polygon', 'Tron (TRC-20)', 'Bitcoin', 'Arbitrum', 'Base', 'Other']
 
 const inputClass = "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-violet-500 focus:bg-white/[0.05] focus:ring-4 focus:ring-violet-500/10"
 
@@ -26,7 +26,8 @@ export default function MemberProfile() {
     resolver: zodResolver(schema),
     defaultValues: {
       address: profile?.address ?? '',
-      solana_account: profile?.solana_account ?? '',
+      payout_network: profile?.payout_network ?? '',
+      wallet_address: profile?.wallet_address ?? '',
     },
   })
 
@@ -35,7 +36,8 @@ export default function MemberProfile() {
     setSaved(false)
     const { error: rpcError } = await supabase.rpc('update_my_account_info', {
       p_address: data.address,
-      p_solana_account: data.solana_account,
+      p_payout_network: data.payout_network,
+      p_wallet_address: data.wallet_address,
     })
     if (rpcError) { setError(rpcError.message); return }
     if (session) await fetchProfile(session.user.id)
@@ -84,10 +86,19 @@ export default function MemberProfile() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300"><Wallet size={14} className="text-gray-500" /> Main Solana account</label>
-          <input {...register('solana_account')} type="text" autoComplete="off" spellCheck={false} className={inputClass} placeholder="Your Solana wallet address" />
+          <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300"><Wallet size={14} className="text-gray-500" /> Payout network / chain</label>
+          <select {...register('payout_network')} className={inputClass}>
+            <option value="" disabled>Select a network</option>
+            {NETWORKS.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          {errors.payout_network && <p className="text-xs text-red-400">{errors.payout_network.message}</p>}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300"><Wallet size={14} className="text-gray-500" /> Wallet address</label>
+          <input {...register('wallet_address')} type="text" autoComplete="off" spellCheck={false} className={inputClass} placeholder="Your wallet address" />
           <p className="text-xs text-gray-500">This is your default payout account for returned funds.</p>
-          {errors.solana_account && <p className="text-xs text-red-400">{errors.solana_account.message}</p>}
+          {errors.wallet_address && <p className="text-xs text-red-400">{errors.wallet_address.message}</p>}
         </div>
 
         <button

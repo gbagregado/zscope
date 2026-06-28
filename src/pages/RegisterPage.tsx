@@ -11,10 +11,8 @@ const schema = z.object({
   full_name: z.string().min(2, 'Full name must be at least 2 characters'),
   email: z.string().email('Invalid email'),
   address: z.string().min(5, 'Please enter your full address'),
-  solana_account: z.string()
-    .min(32, 'Solana address looks too short')
-    .max(44, 'Solana address looks too long')
-    .regex(/^[1-9A-HJ-NP-Za-km-z]+$/, 'Not a valid Solana address'),
+  payout_network: z.string().min(1, 'Please select a network'),
+  wallet_address: z.string().min(20, 'Wallet address looks too short').max(120, 'Wallet address looks too long'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirm: z.string(),
 }).refine((d) => d.password === d.confirm, {
@@ -22,6 +20,8 @@ const schema = z.object({
   path: ['confirm'],
 })
 type FormData = z.infer<typeof schema>
+
+const NETWORKS = ['Solana', 'Ethereum (ERC-20)', 'BNB Smart Chain (BEP-20)', 'Polygon', 'Tron (TRC-20)', 'Bitcoin', 'Arbitrum', 'Base', 'Other']
 
 const inputClass = "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-gray-100 placeholder-gray-400 outline-none transition focus:border-violet-500 focus:bg-white/[0.05] focus:ring-4 focus:ring-violet-500/10"
 
@@ -38,7 +38,7 @@ export default function RegisterPage() {
     const { error: signUpError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: { data: { full_name: data.full_name, address: data.address, solana_account: data.solana_account } },
+      options: { data: { full_name: data.full_name, address: data.address, payout_network: data.payout_network, wallet_address: data.wallet_address } },
     })
     if (signUpError) { setError(signUpError.message); return }
     navigate('/pending')
@@ -130,10 +130,19 @@ export default function RegisterPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-300">Main Solana account</label>
-              <input {...register('solana_account')} type="text" autoComplete="off" spellCheck={false} className={inputClass} placeholder="Your Solana wallet address" />
+              <label className="text-sm font-medium text-gray-300">Payout network / chain</label>
+              <select {...register('payout_network')} defaultValue="" className={inputClass}>
+                <option value="" disabled>Select a network</option>
+                {NETWORKS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              {errors.payout_network && <p className="text-xs text-red-400">{errors.payout_network.message}</p>}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">Wallet address</label>
+              <input {...register('wallet_address')} type="text" autoComplete="off" spellCheck={false} className={inputClass} placeholder="Your wallet address" />
               <p className="text-xs text-gray-500">Used as your default payout account so we always know where to send your funds.</p>
-              {errors.solana_account && <p className="text-xs text-red-400">{errors.solana_account.message}</p>}
+              {errors.wallet_address && <p className="text-xs text-red-400">{errors.wallet_address.message}</p>}
             </div>
 
             <div className="flex flex-col gap-2">

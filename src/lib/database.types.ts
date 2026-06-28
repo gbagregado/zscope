@@ -13,10 +13,12 @@ export interface Database {
           terms_accepted_at: string | null
           address: string | null
           solana_account: string | null
+          payout_network: string | null
+          wallet_address: string | null
           created_at: string
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at'>
-        Update: { role?: 'admin' | 'member'; status?: 'pending' | 'active' | 'rejected'; full_name?: string; email?: string; terms_accepted_at?: string | null; address?: string | null; solana_account?: string | null }
+        Update: { role?: 'admin' | 'member'; status?: 'pending' | 'active' | 'rejected'; full_name?: string; email?: string; terms_accepted_at?: string | null; address?: string | null; solana_account?: string | null; payout_network?: string | null; wallet_address?: string | null }
         Relationships: []
       }
       transactions: {
@@ -405,7 +407,7 @@ export interface Database {
         Returns: undefined
       }
       update_my_account_info: {
-        Args: { p_address: string; p_solana_account: string }
+        Args: { p_address: string; p_payout_network: string; p_wallet_address: string }
         Returns: undefined
       }
     }

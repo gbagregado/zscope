@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { CheckCircle, XCircle, Clock, Users, UserMinus, AlertTriangle, X, Paperclip } from 'lucide-react'
 import clsx from 'clsx'
 
-type Member = { id: string; full_name: string; email: string; role: string; status: 'pending' | 'active' | 'rejected'; address: string | null; solana_account: string | null }
+type Member = { id: string; full_name: string; email: string; role: string; status: 'pending' | 'active' | 'rejected'; address: string | null; payout_network: string | null; wallet_address: string | null }
 
 const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
@@ -189,7 +189,7 @@ export default function AdminMembers() {
                       <div>
                         <p className="text-sm font-medium text-gray-200">{m.full_name}</p>
                         <p className="text-xs text-gray-600">{m.email}</p>
-                        {m.solana_account && <p className="mt-0.5 truncate text-[11px] text-gray-600" title={m.solana_account}>◎ {m.solana_account.slice(0, 6)}…{m.solana_account.slice(-4)}</p>}
+                        {m.wallet_address && <p className="mt-0.5 truncate text-[11px] text-gray-600" title={`${m.payout_network ?? ''} ${m.wallet_address}`}>{m.payout_network ? `${m.payout_network}: ` : ''}{m.wallet_address.slice(0, 6)}…{m.wallet_address.slice(-4)}</p>}
                       </div>
                     </div>
                   </td>
@@ -255,9 +255,15 @@ export default function AdminMembers() {
               <p className="text-[11px] font-medium uppercase tracking-wide text-violet-300">Member payout details</p>
               <div className="mt-1.5 space-y-1">
                 <div>
-                  <span className="text-gray-500">Solana account: </span>
-                  {revokeTarget.solana_account
-                    ? <span className="break-all font-medium text-gray-200">{revokeTarget.solana_account}</span>
+                  <span className="text-gray-500">Network: </span>
+                  {revokeTarget.payout_network
+                    ? <span className="font-medium text-gray-200">{revokeTarget.payout_network}</span>
+                    : <span className="text-gray-500 italic">not provided</span>}
+                </div>
+                <div>
+                  <span className="text-gray-500">Wallet address: </span>
+                  {revokeTarget.wallet_address
+                    ? <span className="break-all font-medium text-gray-200">{revokeTarget.wallet_address}</span>
                     : <span className="text-gray-500 italic">not provided</span>}
                 </div>
                 <div>
@@ -267,8 +273,8 @@ export default function AdminMembers() {
                     : <span className="text-gray-500 italic">not provided</span>}
                 </div>
               </div>
-              {revokeTarget.solana_account && (
-                <button onClick={() => setDisbursementNote(`Solana: ${revokeTarget.solana_account}`)} className="mt-2 text-[11px] text-violet-400 hover:text-violet-300">Use Solana account as disbursement note</button>
+              {revokeTarget.wallet_address && (
+                <button onClick={() => setDisbursementNote(`${revokeTarget.payout_network ? revokeTarget.payout_network + ': ' : ''}${revokeTarget.wallet_address}`)} className="mt-2 text-[11px] text-violet-400 hover:text-violet-300">Use wallet address as disbursement note</button>
               )}
             </div>
 
