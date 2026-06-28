@@ -85,7 +85,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 <div className="flex-1">
                   <h3 className="text-base font-semibold text-white">{options.title}</h3>
                   {options.message && (
-                    <p className="mt-1.5 text-sm leading-relaxed text-gray-400">{options.message}</p>
+                    <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-gray-400">{options.message}</p>
                   )}
                 </div>
               </div>

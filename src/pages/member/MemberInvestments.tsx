@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { useConfirm } from '../../components/ConfirmDialog'
 import { Building2, TrendingUp, X } from 'lucide-react'
 
 const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
@@ -26,6 +27,7 @@ function lockedUntil(inv: MyInv | undefined, center: Center | undefined): Date |
 export default function MemberInvestments() {
   const { profile } = useAuthStore()
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const [joinTarget, setJoinTarget] = useState<Center | null>(null)
   const [pullTarget, setPullTarget] = useState<{ inv: MyInv; center: Center | undefined } | null>(null)
   const [amount, setAmount] = useState('')
@@ -109,7 +111,17 @@ export default function MemberInvestments() {
       if (amt > remaining) { setError(`Per-member limit is ${fmt(joinTarget.max_per_member)}. You can add up to ${fmt(remaining)} more.`); return }
     }
     if (balance && amt > balance.balance) { setError(`Amount exceeds your wallet balance (${fmt(balance.balance)})`); return }
-    if (joinTarget) join.mutate({ center: joinTarget, amt })
+    if (!joinTarget) return
+    const adding = investedCenterIds.has(joinTarget.id)
+    const lockNote = joinTarget.lock_in_months > 0
+      ? `\n\n⚠️ This center has a ${joinTarget.lock_in_months}-month lock-in period. Once approved, you will NOT be able to add more funds or pull out until the lock-in ends.`
+      : ''
+    confirm({
+      title: adding ? `Add ${fmt(amt)} to ${joinTarget.name}?` : `Join ${joinTarget.name} with ${fmt(amt)}?`,
+      message: `${fmt(amt)} will be deducted from your wallet once an admin approves your request.${lockNote}`,
+      confirmText: adding ? 'Add Funds' : 'Confirm Join',
+      tone: joinTarget.lock_in_months > 0 ? 'danger' : 'default',
+    }).then((ok) => { if (ok) join.mutate({ center: joinTarget, amt }) })
   }
 
   function submitPull() {
