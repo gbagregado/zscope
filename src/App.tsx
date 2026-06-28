@@ -32,6 +32,7 @@ import MemberPaymentRequest from './pages/member/MemberPaymentRequest'
 import MemberWithdrawal from './pages/member/MemberWithdrawal'
 import MemberAnnouncements from './pages/member/MemberAnnouncements'
 import MemberInvestments from './pages/member/MemberInvestments'
+import MemberProfile from './pages/member/MemberProfile'
 
 const queryClient = new QueryClient()
 
@@ -94,6 +95,7 @@ function AppInner() {
           <Route path="withdraw" element={<MemberWithdrawal />} />
           <Route path="investments" element={<MemberInvestments />} />
           <Route path="announcements" element={<MemberAnnouncements />} />
+          <Route path="profile" element={<MemberProfile />} />
         </Route>
       </Route>
 

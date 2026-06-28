@@ -30,6 +30,7 @@ const pageTitles: Record<string, string> = {
   '/dashboard/withdraw': 'Withdraw Funds',
   '/dashboard/investments': 'Investments',
   '/dashboard/announcements': 'Announcements',
+  '/dashboard/profile': 'Payout Details',
 }
 
 export default function MemberLayout() {
@@ -76,7 +77,15 @@ export default function MemberLayout() {
 
         {/* User */}
         <div className="border-t border-white/6 p-2">
-          <div className="mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2">
+          <NavLink
+            to="/dashboard/profile"
+            className={({ isActive }) =>
+              clsx(
+                'mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2 transition',
+                isActive ? 'bg-violet-600/15' : 'hover:bg-white/5'
+              )
+            }
+          >
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600/20 text-xs font-semibold text-violet-300">
               {profile?.full_name?.[0]?.toUpperCase() ?? 'M'}
             </div>
@@ -84,7 +93,7 @@ export default function MemberLayout() {
               <p className="truncate text-xs font-medium text-gray-300">{profile?.full_name}</p>
               <p className="truncate text-[10px] text-gray-600">{profile?.email}</p>
             </div>
-          </div>
+          </NavLink>
           <button
             onClick={handleSignOut}
             className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-500 transition hover:bg-red-500/8 hover:text-red-400"
@@ -100,9 +109,14 @@ export default function MemberLayout() {
         {/* Top bar */}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/6 bg-[#111111] px-4 md:px-6">
           <h1 className="text-sm font-semibold text-white md:text-base">{pageTitle}</h1>
-          <button onClick={handleSignOut} className="flex md:hidden items-center gap-1.5 text-xs text-gray-500 hover:text-red-400 transition">
-            <LogOut size={14} />
-          </button>
+          <div className="flex md:hidden items-center gap-3">
+            <NavLink to="/dashboard/profile" aria-label="Payout details" className={({ isActive }) => clsx('flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition', isActive ? 'bg-violet-600 text-white' : 'bg-violet-600/20 text-violet-300')}>
+              {profile?.full_name?.[0]?.toUpperCase() ?? 'M'}
+            </NavLink>
+            <button onClick={handleSignOut} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-red-400 transition">
+              <LogOut size={14} />
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 overflow-auto p-4 pb-24 md:p-6 md:pb-6">
