@@ -1025,21 +1025,38 @@ grant execute on function public.set_member_cap(uuid, uuid, numeric) to authenti
 create table if not exists public.investment_removals (
   id uuid primary key default gen_random_uuid(),
   investment_id uuid not null,
-  member_id uuid not null references public.profiles(id),
-  center_id uuid not null references public.investment_centers(id),
+  member_id uuid not null references public.profiles(id) on delete cascade,
+  center_id uuid not null references public.investment_centers(id) on delete cascade,
   mode text not null check (mode in ('all', 'capital')),
   returned_amount numeric(14,2) not null,
   forfeited_amount numeric(14,2) not null default 0,
   reason text not null,
   removal_tx_id uuid,
   wallet_tx_id uuid,
-  removed_by uuid references public.profiles(id),
+  removed_by uuid references public.profiles(id) on delete set null,
   reverted_at timestamptz,
-  reverted_by uuid references public.profiles(id),
+  reverted_by uuid references public.profiles(id) on delete set null,
   disbursement_note text,
   proof_url text,
   created_at timestamptz not null default now()
 );
+
+-- Re-point the audit FKs to cascade for databases created before this was
+-- the default, so deleting a center (or member) cleans up its audit rows.
+alter table public.investment_removals
+  drop constraint if exists investment_removals_center_id_fkey,
+  drop constraint if exists investment_removals_member_id_fkey,
+  drop constraint if exists investment_removals_removed_by_fkey,
+  drop constraint if exists investment_removals_reverted_by_fkey;
+alter table public.investment_removals
+  add constraint investment_removals_center_id_fkey
+    foreign key (center_id) references public.investment_centers(id) on delete cascade,
+  add constraint investment_removals_member_id_fkey
+    foreign key (member_id) references public.profiles(id) on delete cascade,
+  add constraint investment_removals_removed_by_fkey
+    foreign key (removed_by) references public.profiles(id) on delete set null,
+  add constraint investment_removals_reverted_by_fkey
+    foreign key (reverted_by) references public.profiles(id) on delete set null;
 
 alter table public.investment_removals enable row level security;
 drop policy if exists "Admins read removals" on public.investment_removals;
