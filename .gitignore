@@ -2,6 +2,9 @@
 .env
 .env.local
 
+# Private business/strategy docs — keep local, never hand to client
+docs/
+
 # Logs
 logs
 *.log

@@ -202,18 +202,20 @@ export interface Database {
         Row: {
           id: string
           investment_id: string
-          type: 'deposit' | 'profit' | 'withdrawal'
+          type: 'deposit' | 'profit' | 'withdrawal' | 'reversal'
           amount: number
           description: string | null
           created_by: string | null
+          reverses_id: string | null
           created_at: string
         }
         Insert: {
           investment_id: string
-          type: 'deposit' | 'profit' | 'withdrawal'
+          type: 'deposit' | 'profit' | 'withdrawal' | 'reversal'
           amount: number
           description?: string | null
           created_by?: string | null
+          reverses_id?: string | null
         }
         Update: Partial<Database['public']['Tables']['investment_transactions']['Insert']>
         Relationships: []
@@ -305,6 +307,14 @@ export interface Database {
       }
       approve_investment_withdrawal: {
         Args: { p_request_id: string }
+        Returns: undefined
+      }
+      reverse_wallet_transaction: {
+        Args: { p_transaction_id: string }
+        Returns: undefined
+      }
+      reverse_investment_transaction: {
+        Args: { p_tx_id: string }
         Returns: undefined
       }
     }

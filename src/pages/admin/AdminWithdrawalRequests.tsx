@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore'
 import { CheckCircle, XCircle, ExternalLink } from 'lucide-react'
 import clsx from 'clsx'
 import type { Database } from '../../lib/database.types'
+import { useConfirm } from '../../components/ConfirmDialog'
 
 type WithdrawalRow = Database['public']['Tables']['withdrawal_requests']['Row'] & {
   member: { full_name: string; email: string } | null
@@ -13,6 +14,7 @@ type WithdrawalRow = Database['public']['Tables']['withdrawal_requests']['Row'] 
 export default function AdminWithdrawalRequests() {
   const qc = useQueryClient()
   const { profile } = useAuthStore()
+  const confirm = useConfirm()
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [refs, setRefs] = useState<Record<string, string>>({})
   const [proofFiles, setProofFiles] = useState<Record<string, File>>({})
@@ -70,6 +72,28 @@ export default function AdminWithdrawalRequests() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['withdrawal-requests-admin'] }),
   })
 
+  const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+
+  async function approveRequest(r: WithdrawalRow) {
+    const ok = await confirm({
+      title: 'Approve & debit withdrawal',
+      message: `Approve paying out ${fmt(Number(r.amount))} to ${(r.member as any)?.full_name ?? 'this member'}? This debits their wallet. Send the funds to ${r.member_payment_method} (${r.member_account_number}) first.`,
+      confirmText: 'Approve & debit',
+    })
+    if (!ok) return
+    review.mutate({ id: r.id, status: 'approved', memberId: r.member_id, amount: Number(r.amount), note: notes[r.id] ?? '', ref: refs[r.id] ?? '' })
+  }
+  async function rejectRequest(r: WithdrawalRow) {
+    const ok = await confirm({
+      title: 'Reject withdrawal',
+      message: `Reject ${(r.member as any)?.full_name ?? 'this member'}'s withdrawal of ${fmt(Number(r.amount))}?`,
+      confirmText: 'Reject',
+      tone: 'danger',
+    })
+    if (!ok) return
+    review.mutate({ id: r.id, status: 'rejected', memberId: r.member_id, amount: Number(r.amount), note: notes[r.id] ?? '', ref: refs[r.id] ?? '' })
+  }
+
   if (isLoading) return <div className="text-gray-500 text-sm">Loading…</div>
 
   const pending = requests?.filter((r) => r.status === 'pending') ?? []
@@ -119,13 +143,13 @@ export default function AdminWithdrawalRequests() {
             />
             <div className="flex gap-2">
               <button
-                onClick={() => review.mutate({ id: r.id, status: 'approved', memberId: r.member_id, amount: Number(r.amount), note: notes[r.id] ?? '', ref: refs[r.id] ?? '' })}
+                onClick={() => approveRequest(r)}
                 className="flex items-center gap-1 rounded-lg bg-green-500/10 border border-green-500/30 px-3 py-1.5 text-xs text-green-400 hover:bg-green-500/20 transition-colors"
               >
                 <CheckCircle size={12} /> Approve & Debit
               </button>
               <button
-                onClick={() => review.mutate({ id: r.id, status: 'rejected', memberId: r.member_id, amount: Number(r.amount), note: notes[r.id] ?? '', ref: refs[r.id] ?? '' })}
+                onClick={() => rejectRequest(r)}
                 className="flex items-center gap-1 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors"
               >
                 <XCircle size={12} /> Reject

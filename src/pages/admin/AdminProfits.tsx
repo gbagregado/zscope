@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { TrendingUp, Search, CheckSquare, Square, X, Users } from 'lucide-react'
+import { TrendingUp, Search, CheckSquare, Square, X, Users, RotateCcw } from 'lucide-react'
+import { useConfirm } from '../../components/ConfirmDialog'
 
 type ProfitRow = {
   id: string
   amount: number
+  type: 'credit' | 'debit'
   description: string
   created_at: string
   member: { full_name: string } | null
@@ -15,12 +17,14 @@ type ProfitRow = {
 export default function AdminProfits() {
   const qc = useQueryClient()
   const { profile } = useAuthStore()
+  const confirm = useConfirm()
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [search, setSearch] = useState('')
   const [feedback, setFeedback] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
   // bulk selection
   const [selected, setSelected] = useState<Map<string, string>>(new Map()) // id -> full_name
+  const [bulkMode, setBulkMode] = useState<'amount' | 'percent'>('amount')
   const [bulkAmount, setBulkAmount] = useState('')
   const [bulkNote, setBulkNote] = useState('')
 
@@ -41,7 +45,7 @@ export default function AdminProfits() {
     queryFn: async (): Promise<ProfitRow[]> => {
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, amount, description, created_at, member:profiles!member_id(full_name)')
+        .select('id, amount, type, description, created_at, member:profiles!member_id(full_name)')
         .eq('source', 'profit')
         .order('created_at', { ascending: false })
         .limit(10)
@@ -78,22 +82,29 @@ export default function AdminProfits() {
 
   const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
-  function submit(memberId: string) {
+  async function submit(memberId: string) {
     const raw = amounts[memberId]
     const amount = Number(raw)
     if (!raw || isNaN(amount) || amount <= 0) {
       setFeedback({ id: memberId, msg: 'Enter a valid amount', ok: false })
       return
     }
+    const m = (members ?? []).find((x) => x.member_id === memberId)
+    const ok = await confirm({
+      title: 'Add profit',
+      message: `Credit ${fmt(amount)} profit to ${m?.full_name ?? 'this member'}?`,
+      confirmText: 'Add profit',
+    })
+    if (!ok) return
     addProfit.mutate({ memberId, amount, note: notes[memberId] ?? '' })
   }
 
   const bulkAdd = useMutation({
-    mutationFn: async ({ ids, amount, note }: { ids: string[]; amount: number; note: string }) => {
-      const rows = ids.map((id) => ({
-        member_id: id,
+    mutationFn: async ({ entries, note }: { entries: { id: string; amount: number }[]; note: string }) => {
+      const rows = entries.map((e) => ({
+        member_id: e.id,
         type: 'credit' as const,
-        amount,
+        amount: e.amount,
         description: note || 'Profit',
         created_by: profile!.id,
         source: 'profit' as const,
@@ -107,11 +118,51 @@ export default function AdminProfits() {
       qc.invalidateQueries({ queryKey: ['admin-recent-profits'] })
       setSelected(new Map())
       setBulkAmount(''); setBulkNote('')
-      setFeedback({ id: 'bulk', msg: `Profit added to ${vars.ids.length} member${vars.ids.length === 1 ? '' : 's'}`, ok: true })
+      setFeedback({ id: 'bulk', msg: `Profit added to ${vars.entries.length} member${vars.entries.length === 1 ? '' : 's'}`, ok: true })
       setTimeout(() => setFeedback(null), 3000)
     },
     onError: (e: unknown) => setFeedback({ id: 'bulk', msg: e instanceof Error ? e.message : 'Failed', ok: false }),
   })
+
+  // Compute per-member amounts for the current bulk inputs.
+  function bulkEntries(): { id: string; amount: number }[] {
+    const val = Number(bulkAmount)
+    if (isNaN(val) || val <= 0) return []
+    const out: { id: string; amount: number }[] = []
+    for (const id of selected.keys()) {
+      if (bulkMode === 'percent') {
+        const m = (members ?? []).find((x) => x.member_id === id)
+        const amt = Math.round(Number(m?.balance ?? 0) * val) / 100 // balance * pct / 100, to cents
+        if (amt > 0) out.push({ id, amount: amt })
+      } else {
+        out.push({ id, amount: Math.round(val * 100) / 100 })
+      }
+    }
+    return out
+  }
+
+  const reverseProfit = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('reverse_wallet_transaction', { p_transaction_id: id })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-profit-members'] })
+      qc.invalidateQueries({ queryKey: ['admin-recent-profits'] })
+    },
+    onError: (e: unknown) => alert(e instanceof Error ? e.message : 'Failed to undo'),
+  })
+
+  async function undoProfit(p: ProfitRow) {
+    const ok = await confirm({
+      title: 'Undo profit',
+      message: `Reverse ${fmt(Number(p.amount))} profit for ${p.member?.full_name ?? 'this member'}? It is deducted back from their balance and a reversal record is kept.`,
+      confirmText: 'Undo profit',
+      tone: 'danger',
+    })
+    if (!ok) return
+    reverseProfit.mutate(p.id)
+  }
 
   function toggleMember(id: string, name: string) {
     setSelected((prev) => {
@@ -121,11 +172,24 @@ export default function AdminProfits() {
     })
   }
 
-  function submitBulk() {
-    const amount = Number(bulkAmount)
+  async function submitBulk() {
     if (selected.size === 0) { setFeedback({ id: 'bulk', msg: 'Select at least one member', ok: false }); return }
-    if (!bulkAmount || isNaN(amount) || amount <= 0) { setFeedback({ id: 'bulk', msg: 'Enter a valid amount', ok: false }); return }
-    bulkAdd.mutate({ ids: [...selected.keys()], amount, note: bulkNote })
+    const val = Number(bulkAmount)
+    if (!bulkAmount || isNaN(val) || val <= 0) {
+      setFeedback({ id: 'bulk', msg: bulkMode === 'percent' ? 'Enter a valid percent' : 'Enter a valid amount', ok: false }); return
+    }
+    const entries = bulkEntries()
+    if (entries.length === 0) { setFeedback({ id: 'bulk', msg: 'Selected members have no balance to apply a percentage to', ok: false }); return }
+    const total = entries.reduce((s, e) => s + e.amount, 0)
+    const ok = await confirm({
+      title: 'Add profit',
+      message: bulkMode === 'percent'
+        ? `Give ${val}% to ${entries.length} member${entries.length === 1 ? '' : 's'}. Total ${fmt(total)} will be credited.`
+        : `Credit ${fmt(val)} each to ${entries.length} member${entries.length === 1 ? '' : 's'}. Total ${fmt(total)}.`,
+      confirmText: 'Add profit',
+    })
+    if (!ok) return
+    bulkAdd.mutate({ entries, note: bulkNote })
   }
 
   if (isLoading) return <div className="text-gray-500 text-sm">Loading…</div>
@@ -155,6 +219,24 @@ export default function AdminProfits() {
         />
       </div>
 
+      {/* Select-all toolbar */}
+      {filtered.length > 0 && (
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span className="text-gray-500">{filtered.length} member{filtered.length === 1 ? '' : 's'}{search ? ' matching' : ''}</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelected((prev) => { const n = new Map(prev); for (const m of filtered) n.set(m.member_id, m.full_name ?? 'Member'); return n })}
+              className="rounded-lg border border-violet-500/30 px-2.5 py-1 text-violet-300 hover:bg-violet-500/10"
+            >
+              Select all{search ? ' matching' : ''} ({filtered.length})
+            </button>
+            {selected.size > 0 && (
+              <button onClick={() => setSelected(new Map())} className="rounded-lg border border-gray-700 px-2.5 py-1 text-gray-400 hover:text-gray-200">Clear</button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Bulk selection tray */}
       {selected.size > 0 && (
         <div className="sticky top-2 z-10 rounded-xl border border-violet-500/30 bg-[#1a1626] p-4 shadow-lg">
@@ -172,17 +254,26 @@ export default function AdminProfits() {
               </span>
             ))}
           </div>
+          <div className="mt-3 inline-flex rounded-lg border border-gray-700 bg-[#0f0f0f] p-0.5 text-xs">
+            <button onClick={() => setBulkMode('amount')} className={`rounded-md px-3 py-1.5 transition ${bulkMode === 'amount' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>Fixed amount</button>
+            <button onClick={() => setBulkMode('percent')} className={`rounded-md px-3 py-1.5 transition ${bulkMode === 'percent' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>% of balance</button>
+          </div>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <div className="relative sm:w-40">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
-              <input type="number" min="0" step="0.01" value={bulkAmount} onChange={(e) => setBulkAmount(e.target.value)} placeholder="Amount each" className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 pl-7 pr-3 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+              {bulkMode === 'amount'
+                ? <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                : <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">%</span>}
+              <input type="number" min="0" step={bulkMode === 'percent' ? '0.1' : '0.01'} value={bulkAmount} onChange={(e) => setBulkAmount(e.target.value)} placeholder={bulkMode === 'percent' ? 'Percent each' : 'Amount each'} className={`w-full rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none ${bulkMode === 'amount' ? 'pl-7 pr-3' : 'pl-3 pr-7'}`} />
             </div>
             <input value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} placeholder="Note (optional)" className="flex-1 rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
             <button onClick={submitBulk} disabled={bulkAdd.isPending} className="flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50 transition-colors">
               <TrendingUp size={15} /> Add to {selected.size}
             </button>
           </div>
-          <p className="mt-2 text-[11px] text-gray-500">Each selected member receives the same amount. Search to find more members — your selection stays.</p>
+          {(() => { const e = bulkEntries(); const t = e.reduce((s, x) => s + x.amount, 0); return e.length > 0 && (
+            <p className="mt-2 text-[11px] text-violet-300">Total ≈ {fmt(t)} across {e.length} member{e.length === 1 ? '' : 's'}{bulkMode === 'percent' ? ' (varies by each balance)' : ''}.</p>
+          ) })()}
+          <p className="mt-1 text-[11px] text-gray-500">{bulkMode === 'percent' ? 'Each member receives a % of their own balance.' : 'Each selected member receives the same amount.'} Search to find more members — your selection stays.</p>
           {feedback?.id === 'bulk' && <p className={feedback.ok ? 'mt-1 text-xs text-green-400' : 'mt-1 text-xs text-red-400'}>{feedback.msg}</p>}
         </div>
       )}
@@ -247,17 +338,28 @@ export default function AdminProfits() {
         <h2 className="mb-2 text-sm font-medium text-gray-400">Recent Profit Entries</h2>
         {(recentProfits?.length ?? 0) === 0 && <p className="text-sm text-gray-600">No profit added yet.</p>}
         <div className="space-y-2">
-          {recentProfits?.map((p) => (
-            <div key={p.id} className="flex items-center justify-between rounded-lg border border-gray-800 bg-[#141414] px-4 py-2.5">
-              <div className="min-w-0">
-                <p className="truncate text-sm text-gray-300">{p.member?.full_name ?? 'Member'}</p>
-                <p className="truncate text-xs text-gray-600">
-                  {p.description} · {new Date(p.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
-                </p>
+          {recentProfits?.map((p) => {
+            const isReversal = p.type === 'debit'
+            const reversed = p.description?.startsWith('Reversal:')
+            return (
+              <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-gray-800 bg-[#141414] px-4 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-gray-300">{p.member?.full_name ?? 'Member'}</p>
+                  <p className="truncate text-xs text-gray-600">
+                    {p.description} · {new Date(p.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className={isReversal ? 'text-sm font-medium text-red-400' : 'text-sm font-medium text-green-400'}>{isReversal ? '−' : '+'}{fmt(Number(p.amount))}</p>
+                  {!isReversal && !reversed && (
+                    <button onClick={() => undoProfit(p)} disabled={reverseProfit.isPending} title="Undo this profit" className="flex items-center gap-1 rounded-lg border border-gray-700 px-2 py-1 text-[11px] text-gray-400 hover:border-red-500/40 hover:text-red-400 disabled:opacity-50 transition">
+                      <RotateCcw size={12} /> Undo
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="text-sm font-medium text-green-400">+{fmt(Number(p.amount))}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>

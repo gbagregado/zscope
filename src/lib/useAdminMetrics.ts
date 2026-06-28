@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 
 // ---- raw row types ----
 type Tx = { id: string; member_id: string; type: 'credit' | 'debit'; amount: number; source: string; description: string | null; created_at: string }
-type InvTx = { id: string; investment_id: string; type: 'deposit' | 'profit' | 'withdrawal'; amount: number; created_at: string }
+type InvTx = { id: string; investment_id: string; type: 'deposit' | 'profit' | 'withdrawal' | 'reversal'; amount: number; created_at: string }
 type InvBal = { investment_id: string; member_id: string; center_id: string; balance: number; total_deposits: number; total_profit: number; total_withdrawn: number }
 type CenterRow = { id: string; name: string; image_url: string | null; fund_cap: number; expected_return_pct: number; is_active: boolean }
 type Profile = { id: string; full_name: string; role: string; status: string }
@@ -88,7 +88,7 @@ export function useAdminMetrics() {
       const investmentBalance = bals.reduce((s, b) => s + Number(b.balance), 0)
       const investedCapital = bals.reduce((s, b) => s + Number(b.total_deposits) - Number(b.total_withdrawn), 0)
       const investmentProfit = bals.reduce((s, b) => s + Number(b.total_profit), 0)
-      const walletProfit = txs.filter((t) => t.source === 'profit' && t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
+      const walletProfit = txs.filter((t) => t.source === 'profit').reduce((s, t) => s + (t.type === 'credit' ? Number(t.amount) : -Number(t.amount)), 0)
       const totalProfit = investmentProfit + walletProfit
       const fundsUnderMgmt = walletTotal + investmentBalance
 
@@ -117,7 +117,7 @@ export function useAdminMetrics() {
         if (!p) continue
         if (t.type === 'credit' && (t.source === 'payment_request' || t.source === 'manual')) p.fundsIn += Number(t.amount)
         if (t.type === 'debit' && t.source === 'withdrawal') p.fundsOut += Number(t.amount)
-        if (t.type === 'credit' && t.source === 'profit') p.profit += Number(t.amount)
+        if (t.source === 'profit') p.profit += t.type === 'credit' ? Number(t.amount) : -Number(t.amount)
       }
       for (const it of invTxs) {
         const p = bucketByKey.get(monthKey(new Date(it.created_at)))

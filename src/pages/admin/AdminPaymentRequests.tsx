@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore'
 import { CheckCircle, XCircle, ExternalLink } from 'lucide-react'
 import clsx from 'clsx'
 import type { Database } from '../../lib/database.types'
+import { useConfirm } from '../../components/ConfirmDialog'
 
 type PaymentRow = Database['public']['Tables']['payment_requests']['Row'] & {
   member: { full_name: string; email: string } | null
@@ -13,6 +14,7 @@ type PaymentRow = Database['public']['Tables']['payment_requests']['Row'] & {
 export default function AdminPaymentRequests() {
   const qc = useQueryClient()
   const { profile } = useAuthStore()
+  const confirm = useConfirm()
   const [notes, setNotes] = useState<Record<string, string>>({})
 
   const { data: requests, isLoading } = useQuery({
@@ -54,6 +56,28 @@ export default function AdminPaymentRequests() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['payment-requests-admin'] }),
   })
+
+  const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+
+  async function confirmCredit(r: PaymentRow) {
+    const ok = await confirm({
+      title: 'Confirm & credit funds',
+      message: `Credit ${fmt(Number(r.amount))} to ${(r.member as any)?.full_name ?? 'this member'}'s wallet? Make sure the payment was actually received.`,
+      confirmText: 'Confirm & credit',
+    })
+    if (!ok) return
+    review.mutate({ id: r.id, status: 'confirmed', memberId: r.member_id, amount: Number(r.amount), note: notes[r.id] ?? '' })
+  }
+  async function rejectRequest(r: PaymentRow) {
+    const ok = await confirm({
+      title: 'Reject request',
+      message: `Reject ${(r.member as any)?.full_name ?? 'this member'}'s add-funds request for ${fmt(Number(r.amount))}?`,
+      confirmText: 'Reject',
+      tone: 'danger',
+    })
+    if (!ok) return
+    review.mutate({ id: r.id, status: 'rejected', memberId: r.member_id, amount: Number(r.amount), note: notes[r.id] ?? '' })
+  }
 
   if (isLoading) return <div className="text-gray-500 text-sm">Loading…</div>
 
@@ -100,13 +124,13 @@ export default function AdminPaymentRequests() {
             />
             <div className="flex gap-2">
               <button
-                onClick={() => review.mutate({ id: r.id, status: 'confirmed', memberId: r.member_id, amount: Number(r.amount), note: notes[r.id] ?? '' })}
+                onClick={() => confirmCredit(r)}
                 className="flex items-center gap-1 rounded-lg bg-green-500/10 border border-green-500/30 px-3 py-1.5 text-xs text-green-400 hover:bg-green-500/20 transition-colors"
               >
                 <CheckCircle size={12} /> Confirm & Credit
               </button>
               <button
-                onClick={() => review.mutate({ id: r.id, status: 'rejected', memberId: r.member_id, amount: Number(r.amount), note: notes[r.id] ?? '' })}
+                onClick={() => rejectRequest(r)}
                 className="flex items-center gap-1 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors"
               >
                 <XCircle size={12} /> Reject

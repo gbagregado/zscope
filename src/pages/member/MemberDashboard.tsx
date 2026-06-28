@@ -82,9 +82,10 @@ export default function MemberDashboard() {
     const isCredit = tx.type === 'credit'
     const isProfit = tx.source === 'profit'
     if (isProfit) {
-      totalProfit += amt
-      if (d >= startThisMonth) profitThisMonth += amt
-      else if (d >= startLastMonth) profitLastMonth += amt
+      const signed = isCredit ? amt : -amt
+      totalProfit += signed
+      if (d >= startThisMonth) profitThisMonth += signed
+      else if (d >= startLastMonth) profitLastMonth += signed
     }
     if (d >= startThisMonth) {
       if (isCredit) creditsThisMonth += amt; else debitsThisMonth += amt
