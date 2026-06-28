@@ -10,10 +10,11 @@ export interface Database {
           full_name: string
           role: 'admin' | 'member'
           status: 'pending' | 'active' | 'rejected'
+          terms_accepted_at: string | null
           created_at: string
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at'>
-        Update: { role?: 'admin' | 'member'; status?: 'pending' | 'active' | 'rejected'; full_name?: string; email?: string }
+        Update: { role?: 'admin' | 'member'; status?: 'pending' | 'active' | 'rejected'; full_name?: string; email?: string; terms_accepted_at?: string | null }
         Relationships: []
       }
       transactions: {
@@ -321,6 +322,10 @@ export interface Database {
       }
       reverse_investment_transaction: {
         Args: { p_tx_id: string }
+        Returns: undefined
+      }
+      accept_terms: {
+        Args: Record<string, never>
         Returns: undefined
       }
     }

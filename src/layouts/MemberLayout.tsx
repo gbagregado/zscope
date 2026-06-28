@@ -12,6 +12,7 @@ import {
 import clsx from 'clsx'
 import logo from '../assets/logo.jpeg'
 import LoginPopup from '../components/LoginPopup'
+import TermsGate from '../components/TermsGate'
 
 const nav = [
   { to: '/dashboard', label: 'Dashboard', icon: Home, end: true },
@@ -130,6 +131,7 @@ export default function MemberLayout() {
       </div>
 
       <LoginPopup />
+      <TermsGate />
     </div>
   )
 }

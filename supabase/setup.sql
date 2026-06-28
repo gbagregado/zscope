@@ -46,8 +46,11 @@ create table if not exists public.profiles (
   full_name text not null,
   role text not null default 'member' check (role in ('admin', 'member')),
   status text not null default 'pending' check (status in ('pending', 'active', 'rejected')),
+  terms_accepted_at timestamptz,
   created_at timestamptz not null default now()
 );
+comment on column public.profiles.terms_accepted_at is
+  'When the member accepted the investment awareness/risk agreement. NULL = not yet accepted (will be prompted on login).';
 
 -- 1.2 TRANSACTIONS (wallet ledger — source of truth for balance)
 -- NOTE: source constraint already includes all five values used
@@ -774,6 +777,24 @@ grant execute on function public.investment_locked_until(uuid) to authenticated;
 grant execute on function public.approve_investment_join(uuid) to authenticated;
 grant execute on function public.add_investment_profit(uuid, numeric, text) to authenticated;
 grant execute on function public.approve_investment_withdrawal(uuid) to authenticated;
+
+-- 10.4b Member-callable: record acceptance of the investment awareness agreement.
+-- SECURITY DEFINER so we avoid a broad member UPDATE policy on profiles.
+create or replace function public.accept_terms()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated'; end if;
+  update public.profiles
+    set terms_accepted_at = now()
+    where id = auth.uid() and terms_accepted_at is null;
+end;
+$$;
+
+grant execute on function public.accept_terms() to authenticated;
 
 
 -- 10.5 Undo a wallet entry (offsetting opposite-type transaction)
