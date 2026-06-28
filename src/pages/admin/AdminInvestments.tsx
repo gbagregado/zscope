@@ -11,7 +11,7 @@ import { useConfirm } from '../../components/ConfirmDialog'
 
 type Center = { id: string; name: string; image_url: string | null; fund_cap: number; max_per_member: number }
 type Balance = {
-  investment_id: string; member_id: string; center_id: string; created_at: string
+  investment_id: string; member_id: string; center_id: string; created_at: string; status: 'active' | 'closed'
   balance: number; total_deposits: number; total_profit: number; total_withdrawn: number
 }
 type JoinReq = {
@@ -67,7 +67,7 @@ export default function AdminInvestments() {
     queryFn: async (): Promise<Balance[]> => {
       const { data, error } = await supabase
         .from('investment_balances')
-        .select('investment_id, member_id, center_id, created_at, balance, total_deposits, total_profit, total_withdrawn')
+        .select('investment_id, member_id, center_id, created_at, status, balance, total_deposits, total_profit, total_withdrawn')
       if (error) throw error
       return (data ?? []) as Balance[]
     },
@@ -172,6 +172,7 @@ export default function AdminInvestments() {
     for (const b of balances ?? []) {
       const s = map.get(b.center_id)
       if (!s) continue
+      if (b.status === 'closed') continue
       s.members += 1
       s.totalFunds += Number(b.balance)
       s.totalProfit += Number(b.total_profit)
@@ -191,7 +192,7 @@ export default function AdminInvestments() {
 
   const selectedCenter = centers?.find((c) => c.id === selectedCenterId) ?? null
   const centerMembers = useMemo(
-    () => (balances ?? []).filter((b) => b.center_id === selectedCenterId)
+    () => (balances ?? []).filter((b) => b.center_id === selectedCenterId && b.status !== 'closed')
       .sort((a, b) => Number(b.balance) - Number(a.balance)),
     [balances, selectedCenterId],
   )
