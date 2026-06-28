@@ -394,6 +394,10 @@ export interface Database {
         Args: { p_removal_id: string }
         Returns: undefined
       }
+      revoke_member: {
+        Args: { p_member_id: string; p_mode: string; p_reason: string }
+        Returns: undefined
+      }
     }
   }
 }

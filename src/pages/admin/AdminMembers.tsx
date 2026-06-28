@@ -1,10 +1,19 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { CheckCircle, XCircle, Clock, Users } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Users, UserMinus, AlertTriangle, X } from 'lucide-react'
 import clsx from 'clsx'
+
+type Member = { id: string; full_name: string; email: string; role: string; status: 'pending' | 'active' | 'rejected' }
+
+const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
 export default function AdminMembers() {
   const qc = useQueryClient()
+  const [revokeTarget, setRevokeTarget] = useState<Member | null>(null)
+  const [revokeMode, setRevokeMode] = useState<'all' | 'capital'>('all')
+  const [revokeReason, setRevokeReason] = useState('')
+  const [revokeError, setRevokeError] = useState<string | null>(null)
 
   const { data: members, isLoading } = useQuery({
     queryKey: ['admin-members'],
@@ -25,6 +34,63 @@ export default function AdminMembers() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-members'] }),
   })
+
+  // active investment positions of the member being revoked (for the preview)
+  const { data: revokeInvestments } = useQuery({
+    queryKey: ['revoke-investments', revokeTarget?.id],
+    enabled: !!revokeTarget,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('investment_balances')
+        .select('investment_id, center_id, balance, total_deposits, total_profit, total_withdrawn')
+        .eq('member_id', revokeTarget!.id)
+        .eq('status', 'active')
+      if (error) throw error
+      return data ?? []
+    },
+  })
+
+  const revokeMember = useMutation({
+    mutationFn: async ({ memberId, mode, reason }: { memberId: string; mode: 'all' | 'capital'; reason: string }) => {
+      const { error } = await supabase.rpc('revoke_member', {
+        p_member_id: memberId, p_mode: mode, p_reason: reason,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-members'] })
+      setRevokeTarget(null); setRevokeReason(''); setRevokeError(null)
+    },
+    onError: (e: unknown) => setRevokeError(e instanceof Error ? e.message : 'Failed to revoke member'),
+  })
+
+  function openRevoke(m: Member) {
+    setRevokeTarget(m)
+    setRevokeMode('all')
+    setRevokeReason('')
+    setRevokeError(null)
+  }
+
+  const revokeCalc = (() => {
+    const list = revokeInvestments ?? []
+    let capital = 0, profit = 0, balance = 0, returned = 0
+    for (const inv of list) {
+      const bal = Math.max(0, Number(inv.balance))
+      const cap = Math.max(0, Number(inv.total_deposits) - Number(inv.total_withdrawn))
+      capital += cap
+      profit += Number(inv.total_profit)
+      balance += bal
+      returned += revokeMode === 'all' ? bal : Math.min(cap, bal)
+    }
+    return { count: list.length, capital, profit, balance, returned, forfeited: balance - returned }
+  })()
+
+  function confirmRevoke() {
+    if (!revokeTarget) return
+    if (revokeReason.trim() === '') { setRevokeError('Please enter a reason.'); return }
+    setRevokeError(null)
+    revokeMember.mutate({ memberId: revokeTarget.id, mode: revokeMode, reason: revokeReason.trim() })
+  }
 
   const pending = members?.filter((m) => m.status === 'pending') ?? []
   const others = members?.filter((m) => m.status !== 'pending') ?? []
@@ -133,10 +199,10 @@ export default function AdminMembers() {
                   <td className="px-4 py-3">
                     {m.status === 'active' && (
                       <button
-                        onClick={() => updateStatus.mutate({ id: m.id, status: 'rejected' })}
-                        className="rounded-lg bg-white/4 px-2.5 py-1 text-xs text-gray-500 hover:text-red-400 transition"
+                        onClick={() => openRevoke(m as Member)}
+                        className="flex items-center gap-1.5 rounded-lg bg-white/4 px-2.5 py-1 text-xs text-gray-500 hover:text-red-400 transition"
                       >
-                        Revoke
+                        <UserMinus size={12} /> Revoke
                       </button>
                     )}
                     {m.status === 'rejected' && (
@@ -154,6 +220,55 @@ export default function AdminMembers() {
           </table>
         </div>
       </div>
+
+      {/* Revoke modal — global investment exit */}
+      {revokeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { if (!revokeMember.isPending) setRevokeTarget(null) }}>
+          <div className="w-full max-w-md rounded-2xl border border-gray-800 bg-[#141414] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-gray-100"><UserMinus size={18} className="text-red-400" /> Revoke member access</h3>
+              <button onClick={() => { if (!revokeMember.isPending) setRevokeTarget(null) }} className="text-gray-500 hover:text-gray-300"><X size={18} /></button>
+            </div>
+            <p className="mt-1 text-sm text-gray-400">
+              Revoke access for <span className="font-medium text-gray-200">{revokeTarget.full_name}</span>. This closes
+              {' '}<span className="font-medium text-gray-200">all {revokeCalc.count} active investment{revokeCalc.count === 1 ? '' : 's'}</span> across every center and returns funds to their wallet.
+            </p>
+
+            {/* mode toggle */}
+            <div className="mt-4 inline-flex w-full rounded-lg border border-gray-700 bg-[#0f0f0f] p-0.5 text-xs">
+              <button onClick={() => setRevokeMode('all')} className={`flex-1 rounded-md px-3 py-2 transition ${revokeMode === 'all' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>Return all (capital + profit)</button>
+              <button onClick={() => setRevokeMode('capital')} className={`flex-1 rounded-md px-3 py-2 transition ${revokeMode === 'capital' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>Capital only (forfeit profit)</button>
+            </div>
+
+            {/* aggregate calculation across all investments */}
+            <div className="mt-4 space-y-1.5 rounded-xl border border-gray-800 bg-[#0f0f0f] p-3 text-sm">
+              <div className="flex items-center justify-between"><span className="text-gray-500">Active investments</span><span className="text-gray-300">{revokeCalc.count}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-500">Total invested (capital)</span><span className="text-gray-300">{fmt(revokeCalc.capital)}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-500">Total profit</span><span className="text-green-400">{fmt(revokeCalc.profit)}</span></div>
+              <div className="flex items-center justify-between border-t border-gray-800 pt-1.5"><span className="text-gray-400">Total balance</span><span className="font-medium text-gray-100">{fmt(revokeCalc.balance)}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-400">Returned to wallet</span><span className="font-semibold text-violet-300">{fmt(revokeCalc.returned)}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-400">Forfeited</span><span className={revokeCalc.forfeited > 0 ? 'font-semibold text-red-400' : 'text-gray-500'}>{fmt(revokeCalc.forfeited)}</span></div>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-600">Please verify these figures before confirming. {revokeMode === 'capital' ? 'Profit will be forfeited (kept by the fund).' : 'The full balance is returned.'}</p>
+
+            {/* reason */}
+            <div className="mt-4">
+              <label className="text-xs font-medium text-gray-400">Reason (required, kept for audit)</label>
+              <textarea value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} rows={2} placeholder="e.g. Policy violation / member request" className="mt-1 w-full resize-none rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+            </div>
+
+            {revokeError && <p className="mt-2 flex items-center gap-1 text-xs text-red-400"><AlertTriangle size={12} /> {revokeError}</p>}
+
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => { if (!revokeMember.isPending) setRevokeTarget(null) }} className="flex-1 rounded-lg border border-gray-700 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition">Cancel</button>
+              <button onClick={confirmRevoke} disabled={revokeMember.isPending} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50 transition">
+                <UserMinus size={15} /> {revokeMember.isPending ? 'Revoking…' : `Revoke — return ${fmt(revokeCalc.returned)}`}
+              </button>
+            </div>
+            <p className="mt-2 text-center text-[11px] text-gray-600">Each closed position is logged and can be undone per-investment from its center if you restore the member.</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
