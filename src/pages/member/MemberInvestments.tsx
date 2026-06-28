@@ -8,11 +8,19 @@ const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFracti
 
 type Center = {
   id: string; name: string; description: string | null; image_url: string | null
-  expected_return_pct: number; min_investment: number; maintaining_balance: number; max_per_member: number; is_active: boolean
+  expected_return_pct: number; min_investment: number; maintaining_balance: number; max_per_member: number; lock_in_months: number; is_active: boolean
 }
 type MyInv = {
   investment_id: string; center_id: string; balance: number; total_deposits: number
-  total_profit: number; total_withdrawn: number
+  total_profit: number; total_withdrawn: number; created_at: string
+}
+
+// Lock-in expiry for a member's position; null when the center has no lock-in.
+function lockedUntil(inv: MyInv | undefined, center: Center | undefined): Date | null {
+  if (!inv || !center || !center.lock_in_months || center.lock_in_months <= 0) return null
+  const d = new Date(inv.created_at)
+  d.setMonth(d.getMonth() + center.lock_in_months)
+  return d
 }
 
 export default function MemberInvestments() {
@@ -42,7 +50,7 @@ export default function MemberInvestments() {
     queryFn: async (): Promise<MyInv[]> => {
       const { data, error } = await supabase
         .from('investment_balances')
-        .select('investment_id, center_id, balance, total_deposits, total_profit, total_withdrawn')
+        .select('investment_id, center_id, balance, total_deposits, total_profit, total_withdrawn, created_at')
         .eq('member_id', profile!.id)
       if (error) throw error
       return (data ?? []) as MyInv[]
@@ -87,6 +95,11 @@ export default function MemberInvestments() {
     setError('')
     const amt = Number(amount)
     if (!amount || isNaN(amt) || amt <= 0) { setError('Enter a valid amount'); return }
+    if (joinTarget) {
+      const myInv = (myInvestments ?? []).find((i) => i.center_id === joinTarget.id)
+      const lock = lockedUntil(myInv, joinTarget)
+      if (lock && lock > new Date()) { setError(`Funds are locked until ${lock.toLocaleDateString()}. You can't add more during the lock-in period.`); return }
+    }
     if (joinTarget && amt < joinTarget.min_investment) { setError(`Minimum investment is ${fmt(joinTarget.min_investment)}`); return }
     if (joinTarget && joinTarget.max_per_member > 0) {
       const myInv = (myInvestments ?? []).find((i) => i.center_id === joinTarget.id)
@@ -104,6 +117,8 @@ export default function MemberInvestments() {
     const amt = Number(amount)
     if (!amount || isNaN(amt) || amt <= 0) { setError('Enter a valid amount'); return }
     if (pullTarget) {
+      const lock = lockedUntil(pullTarget.inv, pullTarget.center)
+      if (lock && lock > new Date()) { setError(`Funds are locked until ${lock.toLocaleDateString()} and can't be pulled out yet.`); return }
       if (amt > pullTarget.inv.balance) { setError(`Amount exceeds investment balance (${fmt(pullTarget.inv.balance)})`); return }
       const maintaining = pullTarget.center?.maintaining_balance ?? 0
       if (pullTarget.inv.balance - amt < maintaining) { setError(`Must keep at least ${fmt(maintaining)} maintaining balance`); return }
@@ -133,6 +148,8 @@ export default function MemberInvestments() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {myInvestments?.map((inv) => {
             const c = centerById(inv.center_id)
+            const lock = lockedUntil(inv, c)
+            const isLocked = !!lock && lock > new Date()
             return (
               <div key={inv.investment_id} className="rounded-xl border border-gray-800 bg-[#141414] p-4">
                 <div className="flex items-center gap-2">
@@ -149,9 +166,10 @@ export default function MemberInvestments() {
                   <div className="rounded-lg bg-[#0f0f0f] p-2.5"><p className="text-gray-500">Pulled Out</p><p className="mt-0.5 text-sm text-gray-300">{fmt(inv.total_withdrawn)}</p></div>
                 </div>
                 {c && <p className="mt-2 text-[11px] text-gray-600">Maintaining balance: {fmt(c.maintaining_balance)}</p>}
+                {isLocked && <p className="mt-2 text-[11px] text-amber-400">🔒 Locked until {lock!.toLocaleDateString()} — no adding or pulling out until then.</p>}
                 <div className="mt-3 flex gap-2">
-                  <button onClick={() => { setPullTarget({ inv, center: c }); setAmount(''); setError('') }} className="flex-1 rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 text-xs font-medium text-gray-200 hover:border-violet-500/60 transition">Pull Out</button>
-                  {c?.is_active && <button onClick={() => { setJoinTarget(c); setAmount(''); setError('') }} className="flex-1 rounded-lg bg-violet-600 py-2 text-xs font-medium text-white hover:bg-violet-500 transition">Add Funds</button>}
+                  <button onClick={() => { setPullTarget({ inv, center: c }); setAmount(''); setError('') }} disabled={isLocked} className="flex-1 rounded-lg border border-gray-700 bg-[#0f0f0f] py-2 text-xs font-medium text-gray-200 hover:border-violet-500/60 disabled:cursor-not-allowed disabled:opacity-40 transition">Pull Out</button>
+                  {c?.is_active && <button onClick={() => { setJoinTarget(c); setAmount(''); setError('') }} disabled={isLocked} className="flex-1 rounded-lg bg-violet-600 py-2 text-xs font-medium text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40 transition">Add Funds</button>}
                 </div>
               </div>
             )
@@ -175,6 +193,7 @@ export default function MemberInvestments() {
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
                   <span className="flex items-center gap-1 text-green-400"><TrendingUp size={12} />{c.expected_return_pct}%</span>
                   <span>Min {fmt(c.min_investment)}</span>
+                  {c.lock_in_months > 0 && <span className="text-amber-400">🔒 {c.lock_in_months}-mo lock-in</span>}
                 </div>
                 <button onClick={() => { setJoinTarget(c); setAmount(''); setError('') }} className="mt-3 w-full rounded-lg bg-violet-600 py-2 text-xs font-medium text-white hover:bg-violet-500 transition">Join</button>
               </div>
@@ -187,6 +206,7 @@ export default function MemberInvestments() {
       {joinTarget && (
         <Modal title={investedCenterIds.has(joinTarget.id) ? `Add funds to ${joinTarget.name}` : `Join ${joinTarget.name}`} onClose={closeModals}>
           <p className="text-xs text-gray-500">Minimum {fmt(joinTarget.min_investment)} · Wallet {balance ? fmt(balance.balance) : '—'}</p>
+          {joinTarget.lock_in_months > 0 && <p className="text-[11px] text-amber-400">🔒 {joinTarget.lock_in_months}-month lock-in — funds can't be added to or pulled out during this period.</p>}
           {joinTarget.max_per_member > 0 && (() => {
             const myInv = (myInvestments ?? []).find((i) => i.center_id === joinTarget.id)
             const held = myInv ? Number(myInv.total_deposits) - Number(myInv.total_withdrawn) : 0

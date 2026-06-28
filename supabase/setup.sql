@@ -151,6 +151,7 @@ create table if not exists public.investment_centers (
   maintaining_balance numeric(12,2) not null default 0,
   fund_cap numeric(14,2) not null default 0,
   max_per_member numeric(14,2) not null default 0,
+  lock_in_months integer not null default 0,
   is_active boolean not null default true,
   created_by uuid references public.profiles(id),
   created_at timestamptz not null default now()
@@ -159,6 +160,8 @@ comment on column public.investment_centers.fund_cap is
   'Maximum member capital (net deposits) the center may hold. 0 = unlimited.';
 comment on column public.investment_centers.max_per_member is
   'Maximum net capital (deposits - withdrawals) a single member may hold in this center. 0 = unlimited.';
+comment on column public.investment_centers.lock_in_months is
+  'Months funds stay locked from a member''s first deposit. During the lock-in no additional deposits or withdrawals are allowed. 0 = no lock-in.';
 
 -- 2.2 INVESTMENTS (a member's stake in a center)
 create table if not exists public.investments (
@@ -587,6 +590,27 @@ as $$
   where i.center_id = p_center_id;
 $$;
 
+-- 10.1b Lock-in expiry for an investment (NULL when center has no lock-in)
+create or replace function public.investment_locked_until(p_investment_id uuid)
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+           when coalesce(c.lock_in_months, 0) > 0 then
+             (select min(it.created_at)
+                from public.investment_transactions it
+               where it.investment_id = i.id and it.type = 'deposit')
+             + (c.lock_in_months || ' months')::interval
+           else null
+         end
+  from public.investments i
+  join public.investment_centers c on c.id = i.center_id
+  where i.id = p_investment_id;
+$$;
+
 -- 10.2 Approve a join request (with fund-cap enforcement)
 create or replace function public.approve_investment_join(p_request_id uuid)
 returns void
@@ -602,12 +626,21 @@ declare
   v_raised numeric;
   v_member_cap numeric;
   v_member_invested numeric;
+  v_locked_until timestamptz;
 begin
   if not public.is_admin() then raise exception 'Not authorized'; end if;
 
   select * into r from public.investment_join_requests where id = p_request_id;
   if not found then raise exception 'Request not found'; end if;
   if r.status <> 'pending' then raise exception 'Request already processed'; end if;
+
+  -- enforce lock-in: block ADDING to an existing, still-locked position
+  select public.investment_locked_until(i.id) into v_locked_until
+  from public.investments i
+  where i.member_id = r.member_id and i.center_id = r.center_id;
+  if v_locked_until is not null and now() < v_locked_until then
+    raise exception 'Funds are locked until %. No additional deposits are allowed during the lock-in period.', v_locked_until::date;
+  end if;
 
   -- enforce fund cap (0 = unlimited)
   select fund_cap, max_per_member into v_cap, v_member_cap
@@ -692,12 +725,19 @@ declare
   r record;
   v_balance numeric;
   v_maintaining numeric;
+  v_locked_until timestamptz;
 begin
   if not public.is_admin() then raise exception 'Not authorized'; end if;
 
   select * into r from public.investment_withdrawal_requests where id = p_request_id;
   if not found then raise exception 'Request not found'; end if;
   if r.status <> 'pending' then raise exception 'Request already processed'; end if;
+
+  -- enforce lock-in: no withdrawals while still locked
+  v_locked_until := public.investment_locked_until(r.investment_id);
+  if v_locked_until is not null and now() < v_locked_until then
+    raise exception 'Funds are locked until % and cannot be withdrawn yet.', v_locked_until::date;
+  end if;
 
   select coalesce(sum(case when type in ('deposit','profit') then amount else -amount end), 0)
     into v_balance
@@ -730,6 +770,7 @@ $$;
 -- Grants (functions self-check is_admin internally)
 grant execute on function public.is_admin() to authenticated;
 grant execute on function public.investment_center_raised(uuid) to authenticated;
+grant execute on function public.investment_locked_until(uuid) to authenticated;
 grant execute on function public.approve_investment_join(uuid) to authenticated;
 grant execute on function public.add_investment_profit(uuid, numeric, text) to authenticated;
 grant execute on function public.approve_investment_withdrawal(uuid) to authenticated;

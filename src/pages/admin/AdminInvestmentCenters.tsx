@@ -19,6 +19,7 @@ const schema = z.object({
   maintaining_balance: z.number().min(0),
   fund_cap: z.number().min(0),
   max_per_member: z.number().min(0),
+  lock_in_months: z.number().int().min(0),
 })
 type FormData = z.infer<typeof schema>
 
@@ -46,7 +47,7 @@ export default function AdminInvestmentCenters() {
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0 },
+    defaultValues: { expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0, lock_in_months: 0 },
   })
 
   const save = useMutation({
@@ -60,6 +61,7 @@ export default function AdminInvestmentCenters() {
           maintaining_balance: data.maintaining_balance,
           fund_cap: data.fund_cap,
           max_per_member: data.max_per_member,
+          lock_in_months: data.lock_in_months,
         }
         if (data.image_url || data.storage_path) {
           patch.image_url = data.image_url ?? null
@@ -76,6 +78,7 @@ export default function AdminInvestmentCenters() {
           maintaining_balance: data.maintaining_balance,
           fund_cap: data.fund_cap,
           max_per_member: data.max_per_member,
+          lock_in_months: data.lock_in_months,
           image_url: data.image_url ?? null,
           storage_path: data.storage_path ?? null,
           created_by: profile!.id,
@@ -110,7 +113,7 @@ export default function AdminInvestmentCenters() {
     setEditing(null)
     setImage(null)
     setError('')
-    reset({ name: '', description: '', expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0 })
+    reset({ name: '', description: '', expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0, lock_in_months: 0 })
     setShowForm(true)
   }
 
@@ -126,6 +129,7 @@ export default function AdminInvestmentCenters() {
       maintaining_balance: c.maintaining_balance,
       fund_cap: c.fund_cap,
       max_per_member: c.max_per_member,
+      lock_in_months: c.lock_in_months,
     })
     setShowForm(true)
   }
@@ -135,7 +139,7 @@ export default function AdminInvestmentCenters() {
     setEditing(null)
     setImage(null)
     setError('')
-    reset({ name: '', description: '', expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0 })
+    reset({ name: '', description: '', expected_return_pct: 0, min_investment: 0, maintaining_balance: 0, fund_cap: 0, max_per_member: 0, lock_in_months: 0 })
   }
 
   async function onSubmit(data: FormData) {
@@ -206,6 +210,10 @@ export default function AdminInvestmentCenters() {
             <input type="number" step="0.01" {...register('max_per_member', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
           </div>
           <div>
+            <label className="mb-1 block text-xs text-gray-500">Lock-in Period (months) <span className="text-gray-600">— no adding or withdrawing during lock-in; 0 = none</span></label>
+            <input type="number" step="1" min="0" {...register('lock_in_months', { valueAsNumber: true })} className="w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 focus:border-violet-500 focus:outline-none" />
+          </div>
+          <div>
             <label className="mb-1.5 block text-xs text-gray-500">Image <span className="text-gray-600">(optional{editing ? ' — leave empty to keep current' : ''})</span></label>
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-gray-700 bg-[#0f0f0f] p-3 transition hover:border-violet-500/60 hover:bg-violet-500/5">
               {image ? (
@@ -266,6 +274,7 @@ export default function AdminInvestmentCenters() {
                 <p className="mt-1.5 text-[11px] text-gray-600">Maintaining balance: {fmt(c.maintaining_balance)}</p>
                 <p className="mt-0.5 text-[11px] text-gray-600">Fund cap: {c.fund_cap > 0 ? fmt(c.fund_cap) : 'Unlimited'}</p>
                 <p className="mt-0.5 text-[11px] text-gray-600">Max per member: {c.max_per_member > 0 ? fmt(c.max_per_member) : 'Unlimited'}</p>
+                <p className="mt-0.5 text-[11px] text-gray-600">Lock-in: {c.lock_in_months > 0 ? `${c.lock_in_months} month${c.lock_in_months > 1 ? 's' : ''}` : 'None'}</p>
 
                 {/* Actions */}
                 <div className="mt-3 flex flex-wrap gap-2">
