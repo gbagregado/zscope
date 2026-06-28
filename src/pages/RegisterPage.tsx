@@ -10,7 +10,6 @@ import logo from '../assets/logo.jpeg'
 const schema = z.object({
   full_name: z.string().min(2, 'Full name must be at least 2 characters'),
   email: z.string().email('Invalid email'),
-  address: z.string().min(5, 'Please enter your full address'),
   payout_network: z.string().min(1, 'Please select a network'),
   wallet_address: z.string().min(20, 'Wallet address looks too short').max(120, 'Wallet address looks too long'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -38,7 +37,7 @@ export default function RegisterPage() {
     const { error: signUpError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: { data: { full_name: data.full_name, address: data.address, payout_network: data.payout_network, wallet_address: data.wallet_address } },
+      options: { data: { full_name: data.full_name, payout_network: data.payout_network, wallet_address: data.wallet_address } },
     })
     if (signUpError) { setError(signUpError.message); return }
     navigate('/pending')
@@ -121,12 +120,6 @@ export default function RegisterPage() {
               <label className="text-sm font-medium text-gray-300">Email address</label>
               <input {...register('email')} type="email" autoComplete="email" className={inputClass} placeholder="you@example.com" />
               {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-300">Address</label>
-              <input {...register('address')} type="text" autoComplete="street-address" className={inputClass} placeholder="House no., street, city, province" />
-              {errors.address && <p className="text-xs text-red-400">{errors.address.message}</p>}
             </div>
 
             <div className="flex flex-col gap-2">
