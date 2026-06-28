@@ -5,6 +5,7 @@ import {
   CheckCircle, XCircle, TrendingUp, ArrowDownToLine, ArrowUpFromLine,
   Building2, ChevronRight, ArrowLeft, Users, Wallet, PiggyBank,
   CheckSquare, Square, Sparkles, Search, X, AlertTriangle, RotateCcw,
+  UserMinus, SlidersHorizontal,
 } from 'lucide-react'
 import { useConfirm } from '../../components/ConfirmDialog'
 
@@ -39,11 +40,18 @@ export default function AdminInvestments() {
   const [distBase, setDistBase] = useState<'deposits' | 'balance'>('deposits')
   const [distAmount, setDistAmount] = useState('')
   const [memberSearch, setMemberSearch] = useState('')
+  // per-member cap editing
+  const [capEditing, setCapEditing] = useState<string | null>(null) // member_id
+  const [capInput, setCapInput] = useState('')
+  // member removal (kick-out) flow
+  const [removeTarget, setRemoveTarget] = useState<Balance | null>(null)
+  const [removeMode, setRemoveMode] = useState<'all' | 'capital'>('all')
+  const [removeReason, setRemoveReason] = useState('')
+  const [removeError, setRemoveError] = useState<string | null>(null)
 
   useEffect(() => { setSelected(new Set()); setDistAmount(''); setMemberSearch('') }, [selectedCenterId])
 
-  const { data: centers } = useQuery({
-    queryKey: ['inv-centers-min'],
+  const { data: centers } = useQuery({    queryKey: ['inv-centers-min'],
     queryFn: async (): Promise<Center[]> => {
       const { data, error } = await supabase
         .from('investment_centers')
@@ -124,6 +132,35 @@ export default function AdminInvestments() {
       return data ?? []
     },
   })
+
+  const { data: memberCaps } = useQuery({
+    queryKey: ['inv-member-caps', selectedCenterId],
+    enabled: !!selectedCenterId,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase
+        .from('investment_member_caps')
+        .select('member_id, max_amount')
+        .eq('center_id', selectedCenterId!)
+      if (error) throw error
+      return new Map((data ?? []).map((r) => [r.member_id, Number(r.max_amount)]))
+    },
+  })
+
+  const { data: removals } = useQuery({
+    queryKey: ['inv-removals', selectedCenterId],
+    enabled: !!selectedCenterId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('investment_removals')
+        .select('id, member_id, mode, returned_amount, forfeited_amount, reason, reverted_at, created_at')
+        .eq('center_id', selectedCenterId!)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      if (error) throw error
+      return data ?? []
+    },
+  })
+
   const summaries = useMemo(() => {
     const map = new Map<string, {
       members: number; totalFunds: number; totalProfit: number
@@ -253,6 +290,47 @@ export default function AdminInvestments() {
     onError: (e: unknown) => alert(e instanceof Error ? e.message : 'Failed to undo'),
   })
 
+  const setMemberCap = useMutation({
+    mutationFn: async ({ memberId, max }: { memberId: string; max: number | null }) => {
+      const { error } = await supabase.rpc('set_member_cap', {
+        p_center_id: selectedCenterId!, p_member_id: memberId, p_max: max,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inv-member-caps', selectedCenterId] })
+      setCapEditing(null); setCapInput('')
+    },
+    onError: (e: unknown) => alert(e instanceof Error ? e.message : 'Failed to save limit'),
+  })
+
+  const removeMember = useMutation({
+    mutationFn: async ({ investmentId, mode, reason }: { investmentId: string; mode: 'all' | 'capital'; reason: string }) => {
+      const { error } = await supabase.rpc('remove_member_from_investment', {
+        p_investment_id: investmentId, p_mode: mode, p_reason: reason,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inv-balances'] })
+      qc.invalidateQueries({ queryKey: ['inv-removals', selectedCenterId] })
+      setRemoveTarget(null); setRemoveReason(''); setRemoveError(null)
+    },
+    onError: (e: unknown) => setRemoveError(e instanceof Error ? e.message : 'Failed to remove member'),
+  })
+
+  const undoRemoval = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('undo_member_removal', { p_removal_id: id })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inv-balances'] })
+      qc.invalidateQueries({ queryKey: ['inv-removals', selectedCenterId] })
+    },
+    onError: (e: unknown) => alert(e instanceof Error ? e.message : 'Failed to undo removal'),
+  })
+
   // confirm-gated request actions
   async function doApproveJoin(r: JoinReq) {
     const ok = await confirm({ title: 'Approve join request', message: `Approve ${r.member?.full_name ?? 'this member'} joining with ${fmt(r.amount)}? This debits their wallet and adds the deposit to this center.`, confirmText: 'Approve' })
@@ -281,6 +359,51 @@ export default function AdminInvestments() {
   const displayMembers = memberSearch.trim()
     ? centerMembers.filter((m) => nameOf(m.member_id).toLowerCase().includes(memberSearch.trim().toLowerCase()))
     : centerMembers
+
+  // ---- per-member cap helpers ----
+  function openCapEditor(m: Balance) {
+    const existing = memberCaps?.get(m.member_id)
+    setCapInput(existing != null ? String(existing) : '')
+    setCapEditing(m.member_id)
+  }
+  function saveCap(memberId: string) {
+    const raw = capInput.trim()
+    if (raw === '') { setMemberCap.mutate({ memberId, max: null }); return } // clear → center default
+    const max = Number(raw)
+    if (isNaN(max) || max < 0) { alert('Enter a valid amount (0 = unlimited)'); return }
+    setMemberCap.mutate({ memberId, max })
+  }
+
+  // ---- removal (kick-out) helpers ----
+  function openRemove(m: Balance) {
+    setRemoveTarget(m)
+    setRemoveMode('all')
+    setRemoveReason('')
+    setRemoveError(null)
+  }
+  const removeCalc = useMemo(() => {
+    if (!removeTarget) return { balance: 0, capital: 0, returned: 0, forfeited: 0 }
+    const balance = Math.max(0, Number(removeTarget.balance))
+    const capital = Math.max(0, Number(removeTarget.total_deposits) - Number(removeTarget.total_withdrawn))
+    const returned = removeMode === 'all' ? balance : Math.min(capital, balance)
+    const forfeited = balance - returned
+    return { balance, capital, returned, forfeited }
+  }, [removeTarget, removeMode])
+  function confirmRemove() {
+    if (!removeTarget) return
+    if (removeReason.trim() === '') { setRemoveError('Please enter a reason.'); return }
+    setRemoveError(null)
+    removeMember.mutate({ investmentId: removeTarget.investment_id, mode: removeMode, reason: removeReason.trim() })
+  }
+  async function doUndoRemoval(r: { id: string; member_id: string; returned_amount: number }) {
+    const ok = await confirm({
+      title: 'Undo removal',
+      message: `Reopen ${nameOf(r.member_id)}'s investment and pull back the ${fmt(r.returned_amount)} that was returned to their wallet?\n\nThis only works if those funds are still in their wallet.`,
+      confirmText: 'Undo removal',
+      tone: 'danger',
+    })
+    if (ok) undoRemoval.mutate(r.id)
+  }
 
   // ---- bulk distribution helpers ----
   function toggleMember(id: string) {
@@ -648,10 +771,118 @@ export default function AdminInvestments() {
               </div>
               <button onClick={() => submitProfit(m.investment_id)} disabled={addProfit.isPending} className="flex items-center justify-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50 transition-colors"><TrendingUp size={15} /> Add Profit</button>
             </div>
+
+            {/* Per-member limit + remove */}
+            <div className="mt-3 border-t border-gray-800 pt-3">
+              {capEditing === m.member_id ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative sm:w-44">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                    <input type="number" min="0" step="0.01" value={capInput} onChange={(e) => setCapInput(e.target.value)} placeholder="0 = unlimited" autoFocus className="w-full rounded-lg border border-violet-500/40 bg-[#0f0f0f] py-2 pl-7 pr-3 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => saveCap(m.member_id)} disabled={setMemberCap.isPending} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50 transition">Save</button>
+                    <button onClick={() => { setCapEditing(null); setCapInput('') }} className="rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-400 hover:text-gray-200 transition">Cancel</button>
+                  </div>
+                  <p className="text-[11px] text-gray-600 sm:ml-1">Leave blank to use the center default ({Number(selectedCenter.max_per_member) > 0 ? fmt(Number(selectedCenter.max_per_member)) : 'no limit'}).</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <SlidersHorizontal size={13} className="text-gray-500" />
+                    {(() => {
+                      const override = memberCaps?.get(m.member_id)
+                      if (override != null) {
+                        return <span className="text-gray-400">Limit: <span className="font-medium text-violet-300">{override > 0 ? fmt(override) : 'Unlimited'}</span> <span className="rounded bg-violet-600/20 px-1.5 py-0.5 text-[10px] text-violet-300">custom</span></span>
+                      }
+                      const def = Number(selectedCenter.max_per_member) || 0
+                      return <span className="text-gray-500">Limit: {def > 0 ? fmt(def) : 'No limit'} <span className="text-gray-600">(center default)</span></span>
+                    })()}
+                    <button onClick={() => openCapEditor(m)} className="text-violet-400 hover:text-violet-300">Edit</button>
+                  </div>
+                  <button onClick={() => openRemove(m)} className="flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 transition"><UserMinus size={13} /> Remove</button>
+                </div>
+              )}
+            </div>
             {feedback?.id === m.investment_id && <p className={feedback.ok ? 'mt-2 text-xs text-green-400' : 'mt-2 text-xs text-red-400'}>{feedback.msg}</p>}
           </div>
         ))}
       </section>
+
+      {/* Recent removals — undo a mistake */}
+      {(removals?.length ?? 0) > 0 && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-300"><UserMinus size={15} /> Recent Removals</h2>
+          <div className="rounded-xl border border-gray-800 bg-[#141414] p-4 space-y-2">
+            {removals!.map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-gray-300">
+                    {nameOf(r.member_id)}
+                    {r.reverted_at && <span className="ml-2 rounded bg-gray-700/50 px-1.5 py-0.5 text-[10px] text-gray-400">undone</span>}
+                  </p>
+                  <p className="truncate text-xs text-gray-600">
+                    {r.mode === 'all' ? 'Returned all' : 'Capital only'} · {fmt(Number(r.returned_amount))} back
+                    {Number(r.forfeited_amount) > 0 && <span className="text-red-400/80"> · {fmt(Number(r.forfeited_amount))} forfeited</span>}
+                    {' · '}{fmtDate(r.created_at)}
+                  </p>
+                  <p className="truncate text-[11px] text-gray-700">“{r.reason}”</p>
+                </div>
+                {!r.reverted_at && (
+                  <button onClick={() => doUndoRemoval(r)} disabled={undoRemoval.isPending} title="Undo this removal" className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-700 px-2 py-1 text-[11px] text-gray-400 hover:border-violet-500/40 hover:text-violet-300 disabled:opacity-50 transition">
+                    <RotateCcw size={12} /> Undo
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Removal (kick-out) modal */}
+      {removeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { if (!removeMember.isPending) setRemoveTarget(null) }}>
+          <div className="w-full max-w-md rounded-2xl border border-gray-800 bg-[#141414] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-gray-100"><UserMinus size={18} className="text-red-400" /> Remove from investment</h3>
+              <button onClick={() => { if (!removeMember.isPending) setRemoveTarget(null) }} className="text-gray-500 hover:text-gray-300"><X size={18} /></button>
+            </div>
+            <p className="mt-1 text-sm text-gray-400">Forced full exit for <span className="font-medium text-gray-200">{nameOf(removeTarget.member_id)}</span>. This closes their position in this center and returns funds to their wallet.</p>
+
+            {/* mode toggle */}
+            <div className="mt-4 inline-flex w-full rounded-lg border border-gray-700 bg-[#0f0f0f] p-0.5 text-xs">
+              <button onClick={() => setRemoveMode('all')} className={`flex-1 rounded-md px-3 py-2 transition ${removeMode === 'all' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>Return all (capital + profit)</button>
+              <button onClick={() => setRemoveMode('capital')} className={`flex-1 rounded-md px-3 py-2 transition ${removeMode === 'capital' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}>Capital only (forfeit profit)</button>
+            </div>
+
+            {/* calculation breakdown */}
+            <div className="mt-4 space-y-1.5 rounded-xl border border-gray-800 bg-[#0f0f0f] p-3 text-sm">
+              <div className="flex items-center justify-between"><span className="text-gray-500">Invested (capital)</span><span className="text-gray-300">{fmt(removeCalc.capital)}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-500">Profit earned</span><span className="text-green-400">{fmt(Number(removeTarget.total_profit))}</span></div>
+              <div className="flex items-center justify-between border-t border-gray-800 pt-1.5"><span className="text-gray-400">Current balance</span><span className="font-medium text-gray-100">{fmt(removeCalc.balance)}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-400">Returned to wallet</span><span className="font-semibold text-violet-300">{fmt(removeCalc.returned)}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-400">Forfeited</span><span className={removeCalc.forfeited > 0 ? 'font-semibold text-red-400' : 'text-gray-500'}>{fmt(removeCalc.forfeited)}</span></div>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-600">Please verify these figures before confirming. {removeMode === 'capital' ? 'Profit will be forfeited (kept by the fund).' : 'The full balance is returned.'}</p>
+
+            {/* reason */}
+            <div className="mt-4">
+              <label className="text-xs font-medium text-gray-400">Reason (required, kept for audit)</label>
+              <textarea value={removeReason} onChange={(e) => setRemoveReason(e.target.value)} rows={2} placeholder="e.g. Member requested closure / policy violation" className="mt-1 w-full resize-none rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+            </div>
+
+            {removeError && <p className="mt-2 flex items-center gap-1 text-xs text-red-400"><AlertTriangle size={12} /> {removeError}</p>}
+
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => { if (!removeMember.isPending) setRemoveTarget(null) }} className="flex-1 rounded-lg border border-gray-700 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition">Cancel</button>
+              <button onClick={confirmRemove} disabled={removeMember.isPending} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50 transition">
+                <UserMinus size={15} /> {removeMember.isPending ? 'Removing…' : `Confirm — return ${fmt(removeCalc.returned)}`}
+              </button>
+            </div>
+            <p className="mt-2 text-center text-[11px] text-gray-600">You can undo this from “Recent Removals” if the funds are still in their wallet.</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

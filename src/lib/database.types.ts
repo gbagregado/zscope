@@ -277,6 +277,58 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['investment_withdrawal_requests']['Insert']>
         Relationships: []
       }
+      investment_member_caps: {
+        Row: {
+          center_id: string
+          member_id: string
+          max_amount: number
+          set_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          center_id: string
+          member_id: string
+          max_amount?: number
+          set_by?: string | null
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['investment_member_caps']['Insert']>
+        Relationships: []
+      }
+      investment_removals: {
+        Row: {
+          id: string
+          investment_id: string
+          member_id: string
+          center_id: string
+          mode: 'all' | 'capital'
+          returned_amount: number
+          forfeited_amount: number
+          reason: string
+          removal_tx_id: string | null
+          wallet_tx_id: string | null
+          removed_by: string | null
+          reverted_at: string | null
+          reverted_by: string | null
+          created_at: string
+        }
+        Insert: {
+          investment_id: string
+          member_id: string
+          center_id: string
+          mode: 'all' | 'capital'
+          returned_amount: number
+          forfeited_amount?: number
+          reason: string
+          removal_tx_id?: string | null
+          wallet_tx_id?: string | null
+          removed_by?: string | null
+          reverted_at?: string | null
+          reverted_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['investment_removals']['Insert']>
+        Relationships: []
+      }
     }
     Views: {
       member_balances: {
@@ -328,6 +380,18 @@ export interface Database {
       }
       accept_terms: {
         Args: Record<string, never>
+        Returns: undefined
+      }
+      set_member_cap: {
+        Args: { p_center_id: string; p_member_id: string; p_max: number | null }
+        Returns: undefined
+      }
+      remove_member_from_investment: {
+        Args: { p_investment_id: string; p_mode: string; p_reason: string }
+        Returns: undefined
+      }
+      undo_member_removal: {
+        Args: { p_removal_id: string }
         Returns: undefined
       }
     }
