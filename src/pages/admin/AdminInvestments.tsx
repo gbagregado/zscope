@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useConfirm } from '../../components/ConfirmDialog'
 
-type Center = { id: string; name: string; image_url: string | null; fund_cap: number }
+type Center = { id: string; name: string; image_url: string | null; fund_cap: number; max_per_member: number }
 type Balance = {
   investment_id: string; member_id: string; center_id: string; created_at: string
   balance: number; total_deposits: number; total_profit: number; total_withdrawn: number
@@ -47,7 +47,7 @@ export default function AdminInvestments() {
     queryFn: async (): Promise<Center[]> => {
       const { data, error } = await supabase
         .from('investment_centers')
-        .select('id, name, image_url, fund_cap')
+        .select('id, name, image_url, fund_cap, max_per_member')
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as Center[]
@@ -451,6 +451,11 @@ export default function AdminInvestments() {
             const cap = Number(selectedCenter.fund_cap) || 0
             const raised = (selSummary?.totalDeposits ?? 0) - (selSummary?.totalWithdrawn ?? 0)
             const exceeds = cap > 0 && raised + Number(r.amount) > cap
+            const memberCap = Number(selectedCenter.max_per_member) || 0
+            const memberBal = centerMembers.find((m) => m.member_id === r.member_id)
+            const memberHeld = memberBal ? Number(memberBal.total_deposits) - Number(memberBal.total_withdrawn) : 0
+            const exceedsMember = memberCap > 0 && memberHeld + Number(r.amount) > memberCap
+            const blocked = exceeds || exceedsMember
             return (
             <div key={r.id} className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -459,12 +464,15 @@ export default function AdminInvestments() {
                   <p className="truncate text-xs text-gray-500">wants to join with <span className="text-gray-300">{fmt(r.amount)}</span></p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <button onClick={() => doApproveJoin(r)} disabled={approveJoin.isPending || exceeds} title={exceeds ? 'Exceeds fund cap' : undefined} className="flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"><CheckCircle size={12} /> Approve</button>
+                  <button onClick={() => doApproveJoin(r)} disabled={approveJoin.isPending || blocked} title={exceeds ? 'Exceeds fund cap' : exceedsMember ? 'Exceeds per-member limit' : undefined} className="flex items-center gap-1.5 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-green-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"><CheckCircle size={12} /> Approve</button>
                   <button onClick={() => doRejectJoin(r)} className="flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition"><XCircle size={12} /> Reject</button>
                 </div>
               </div>
               {exceeds && (
                 <p className="mt-2 flex items-center gap-1 text-[11px] text-red-400"><AlertTriangle size={12} /> Approving would exceed the fund cap by {fmt(raised + Number(r.amount) - cap)}. Raise the cap or wait for pull-outs.</p>
+              )}
+              {exceedsMember && (
+                <p className="mt-2 flex items-center gap-1 text-[11px] text-red-400"><AlertTriangle size={12} /> Exceeds the per-member limit of {fmt(memberCap)} (already holds {fmt(memberHeld)}). Raise the limit or reduce the amount.</p>
               )}
             </div>
             )

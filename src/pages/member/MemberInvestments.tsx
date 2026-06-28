@@ -8,7 +8,7 @@ const fmt = (n: number) => `$${Number(n).toLocaleString('en-US', { minimumFracti
 
 type Center = {
   id: string; name: string; description: string | null; image_url: string | null
-  expected_return_pct: number; min_investment: number; maintaining_balance: number; is_active: boolean
+  expected_return_pct: number; min_investment: number; maintaining_balance: number; max_per_member: number; is_active: boolean
 }
 type MyInv = {
   investment_id: string; center_id: string; balance: number; total_deposits: number
@@ -88,6 +88,13 @@ export default function MemberInvestments() {
     const amt = Number(amount)
     if (!amount || isNaN(amt) || amt <= 0) { setError('Enter a valid amount'); return }
     if (joinTarget && amt < joinTarget.min_investment) { setError(`Minimum investment is ${fmt(joinTarget.min_investment)}`); return }
+    if (joinTarget && joinTarget.max_per_member > 0) {
+      const myInv = (myInvestments ?? []).find((i) => i.center_id === joinTarget.id)
+      const held = myInv ? Number(myInv.total_deposits) - Number(myInv.total_withdrawn) : 0
+      const remaining = joinTarget.max_per_member - held
+      if (remaining <= 0) { setError(`You've reached this center's per-member limit of ${fmt(joinTarget.max_per_member)}.`); return }
+      if (amt > remaining) { setError(`Per-member limit is ${fmt(joinTarget.max_per_member)}. You can add up to ${fmt(remaining)} more.`); return }
+    }
     if (balance && amt > balance.balance) { setError(`Amount exceeds your wallet balance (${fmt(balance.balance)})`); return }
     if (joinTarget) join.mutate({ center: joinTarget, amt })
   }
@@ -180,6 +187,12 @@ export default function MemberInvestments() {
       {joinTarget && (
         <Modal title={investedCenterIds.has(joinTarget.id) ? `Add funds to ${joinTarget.name}` : `Join ${joinTarget.name}`} onClose={closeModals}>
           <p className="text-xs text-gray-500">Minimum {fmt(joinTarget.min_investment)} · Wallet {balance ? fmt(balance.balance) : '—'}</p>
+          {joinTarget.max_per_member > 0 && (() => {
+            const myInv = (myInvestments ?? []).find((i) => i.center_id === joinTarget.id)
+            const held = myInv ? Number(myInv.total_deposits) - Number(myInv.total_withdrawn) : 0
+            const remaining = Math.max(0, joinTarget.max_per_member - held)
+            return <p className="text-[11px] text-violet-300">Per-member limit {fmt(joinTarget.max_per_member)} · You can add up to {fmt(remaining)} more.</p>
+          })()}
           <AmountInput value={amount} onChange={setAmount} />
           {error && <p className="text-xs text-red-400">{error}</p>}
           <p className="text-[11px] text-gray-600">The amount will be deducted from your wallet once an admin approves.</p>

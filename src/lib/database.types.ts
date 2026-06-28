@@ -163,6 +163,7 @@ export interface Database {
           min_investment: number
           maintaining_balance: number
           fund_cap: number
+          max_per_member: number
           is_active: boolean
           created_by: string | null
           created_at: string
@@ -176,6 +177,7 @@ export interface Database {
           min_investment?: number
           maintaining_balance?: number
           fund_cap?: number
+          max_per_member?: number
           is_active?: boolean
           created_by?: string | null
         }
