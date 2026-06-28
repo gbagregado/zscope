@@ -917,6 +917,456 @@ end $$;
 
 
 -- ============================================================
+-- 12. MEMBER ACCOUNT INFO + GENERIC PAYOUT DETAILS
+--     (address, network/chain, wallet address)
+-- ============================================================
+alter table public.profiles
+  add column if not exists address text,
+  add column if not exists solana_account text,            -- legacy, kept for history
+  add column if not exists payout_network text,
+  add column if not exists wallet_address text;
+
+-- backfill any legacy solana_account into the generic columns (no-op on fresh DB)
+update public.profiles
+  set wallet_address = solana_account,
+      payout_network = coalesce(payout_network, 'Solana')
+  where wallet_address is null and solana_account is not null;
+
+-- capture address + network + wallet from sign-up metadata on profile creation
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, full_name, role, status, address, payout_network, wallet_address)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'full_name', 'New Member'),
+    'member',
+    'pending',
+    nullif(btrim(coalesce(new.raw_user_meta_data->>'address', '')), ''),
+    nullif(btrim(coalesce(new.raw_user_meta_data->>'payout_network', '')), ''),
+    nullif(btrim(coalesce(new.raw_user_meta_data->>'wallet_address', '')), '')
+  );
+  return new;
+end;
+$$;
+
+-- members keep their own payout details up to date (no broad UPDATE policy,
+-- which would let them change their own role/status)
+drop function if exists public.update_my_account_info(text, text);
+drop function if exists public.update_my_account_info(text, text, text);
+create or replace function public.update_my_account_info(
+  p_address text, p_payout_network text, p_wallet_address text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated'; end if;
+  update public.profiles
+    set address = nullif(btrim(coalesce(p_address, '')), ''),
+        payout_network = nullif(btrim(coalesce(p_payout_network, '')), ''),
+        wallet_address = nullif(btrim(coalesce(p_wallet_address, '')), '')
+    where id = auth.uid();
+end;
+$$;
+grant execute on function public.update_my_account_info(text, text, text) to authenticated;
+
+
+-- ============================================================
+-- 13. PER-MEMBER CAPS + ADMIN REMOVE-FROM-INVESTMENT (kick-out)
+-- ============================================================
+create table if not exists public.investment_member_caps (
+  center_id uuid not null references public.investment_centers(id) on delete cascade,
+  member_id uuid not null references public.profiles(id) on delete cascade,
+  max_amount numeric(14,2) not null default 0,  -- 0 = unlimited for this member
+  set_by uuid references public.profiles(id),
+  updated_at timestamptz not null default now(),
+  primary key (center_id, member_id)
+);
+
+alter table public.investment_member_caps enable row level security;
+drop policy if exists "Members read own cap" on public.investment_member_caps;
+create policy "Members read own cap" on public.investment_member_caps
+  for select using (member_id = auth.uid());
+drop policy if exists "Admins read all caps" on public.investment_member_caps;
+create policy "Admins read all caps" on public.investment_member_caps
+  for select using (public.is_admin());
+drop policy if exists "Admins manage caps" on public.investment_member_caps;
+create policy "Admins manage caps" on public.investment_member_caps
+  for all using (public.is_admin()) with check (public.is_admin());
+
+create or replace function public.set_member_cap(p_center_id uuid, p_member_id uuid, p_max numeric)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then raise exception 'Not authorized'; end if;
+  if p_max is null then
+    delete from public.investment_member_caps
+      where center_id = p_center_id and member_id = p_member_id;
+  else
+    if p_max < 0 then raise exception 'Limit cannot be negative'; end if;
+    insert into public.investment_member_caps(center_id, member_id, max_amount, set_by, updated_at)
+    values (p_center_id, p_member_id, p_max, auth.uid(), now())
+    on conflict (center_id, member_id)
+      do update set max_amount = excluded.max_amount, set_by = auth.uid(), updated_at = now();
+  end if;
+end;
+$$;
+grant execute on function public.set_member_cap(uuid, uuid, numeric) to authenticated;
+
+create table if not exists public.investment_removals (
+  id uuid primary key default gen_random_uuid(),
+  investment_id uuid not null,
+  member_id uuid not null references public.profiles(id),
+  center_id uuid not null references public.investment_centers(id),
+  mode text not null check (mode in ('all', 'capital')),
+  returned_amount numeric(14,2) not null,
+  forfeited_amount numeric(14,2) not null default 0,
+  reason text not null,
+  removal_tx_id uuid,
+  wallet_tx_id uuid,
+  removed_by uuid references public.profiles(id),
+  reverted_at timestamptz,
+  reverted_by uuid references public.profiles(id),
+  disbursement_note text,
+  proof_url text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.investment_removals enable row level security;
+drop policy if exists "Admins read removals" on public.investment_removals;
+create policy "Admins read removals" on public.investment_removals
+  for select using (public.is_admin());
+
+create or replace function public.remove_member_from_investment(
+  p_investment_id uuid, p_mode text, p_reason text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  inv record;
+  v_balance numeric;
+  v_capital numeric;
+  v_return numeric;
+  v_forfeit numeric;
+  v_removal_tx uuid;
+  v_wallet_tx uuid;
+begin
+  if not public.is_admin() then raise exception 'Not authorized'; end if;
+  if p_mode not in ('all', 'capital') then raise exception 'Invalid mode'; end if;
+  if coalesce(btrim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+
+  select i.id, i.member_id, i.center_id, i.status into inv
+  from public.investments i where i.id = p_investment_id;
+  if not found then raise exception 'Investment not found'; end if;
+  if inv.status = 'closed' then raise exception 'Investment is already closed'; end if;
+
+  select coalesce(sum(case when type in ('deposit','profit') then amount
+                           when type in ('withdrawal','reversal') then -amount
+                           else 0 end), 0)
+    into v_balance
+  from public.investment_transactions where investment_id = inv.id;
+  select coalesce(sum(case when type = 'deposit' then amount
+                           when type = 'withdrawal' then -amount
+                           else 0 end), 0)
+    into v_capital
+  from public.investment_transactions where investment_id = inv.id;
+
+  if v_balance < 0 then v_balance := 0; end if;
+  if v_capital < 0 then v_capital := 0; end if;
+  if p_mode = 'all' then v_return := v_balance; else v_return := least(v_capital, v_balance); end if;
+  v_forfeit := v_balance - v_return;
+
+  if v_balance > 0 then
+    insert into public.investment_transactions(investment_id, type, amount, description, created_by)
+    values (inv.id, 'withdrawal', v_balance, 'Removed by admin (' || p_mode || '): ' || p_reason, auth.uid())
+    returning id into v_removal_tx;
+  end if;
+  if v_return > 0 then
+    insert into public.transactions(member_id, type, amount, description, created_by, source, reference_id)
+    values (inv.member_id, 'credit', v_return, 'Removed from investment by admin', auth.uid(), 'investment', inv.id)
+    returning id into v_wallet_tx;
+  end if;
+
+  update public.investments set status = 'closed' where id = inv.id;
+
+  insert into public.investment_removals(
+    investment_id, member_id, center_id, mode, returned_amount, forfeited_amount, reason,
+    removal_tx_id, wallet_tx_id, removed_by)
+  values (inv.id, inv.member_id, inv.center_id, p_mode, v_return, v_forfeit, p_reason,
+          v_removal_tx, v_wallet_tx, auth.uid());
+end;
+$$;
+grant execute on function public.remove_member_from_investment(uuid, text, text) to authenticated;
+
+create or replace function public.undo_member_removal(p_removal_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  rem record;
+  v_wallet_balance numeric;
+begin
+  if not public.is_admin() then raise exception 'Not authorized'; end if;
+  select * into rem from public.investment_removals where id = p_removal_id;
+  if not found then raise exception 'Removal not found'; end if;
+  if rem.reverted_at is not null then raise exception 'This removal was already undone'; end if;
+
+  if rem.returned_amount > 0 then
+    select coalesce(sum(case when type = 'credit' then amount else -amount end), 0)
+      into v_wallet_balance
+    from public.transactions where member_id = rem.member_id;
+    if v_wallet_balance < rem.returned_amount then
+      raise exception 'Cannot undo: member wallet balance ($%) is less than the $% that was returned.',
+        v_wallet_balance, rem.returned_amount;
+    end if;
+  end if;
+
+  if rem.wallet_tx_id is not null then delete from public.transactions where id = rem.wallet_tx_id; end if;
+  if rem.removal_tx_id is not null then delete from public.investment_transactions where id = rem.removal_tx_id; end if;
+  update public.investments set status = 'active' where id = rem.investment_id;
+  update public.investment_removals set reverted_at = now(), reverted_by = auth.uid() where id = p_removal_id;
+end;
+$$;
+grant execute on function public.undo_member_removal(uuid) to authenticated;
+
+-- approve_investment_join re-created to honour the per-member override cap
+create or replace function public.approve_investment_join(p_request_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r record;
+  v_balance numeric;
+  v_investment_id uuid;
+  v_cap numeric;
+  v_raised numeric;
+  v_member_cap numeric;
+  v_override numeric;
+  v_member_invested numeric;
+  v_locked_until timestamptz;
+begin
+  if not public.is_admin() then raise exception 'Not authorized'; end if;
+  select * into r from public.investment_join_requests where id = p_request_id;
+  if not found then raise exception 'Request not found'; end if;
+  if r.status <> 'pending' then raise exception 'Request already processed'; end if;
+
+  select public.investment_locked_until(i.id) into v_locked_until
+  from public.investments i
+  where i.member_id = r.member_id and i.center_id = r.center_id;
+  if v_locked_until is not null and now() < v_locked_until then
+    raise exception 'Funds are locked until %. No additional deposits are allowed during the lock-in period.', v_locked_until::date;
+  end if;
+
+  select fund_cap, max_per_member into v_cap, v_member_cap
+  from public.investment_centers where id = r.center_id;
+  if coalesce(v_cap, 0) > 0 then
+    v_raised := public.investment_center_raised(r.center_id);
+    if v_raised + r.amount > v_cap then
+      raise exception 'Fund cap reached: % of % raised.', v_raised, v_cap;
+    end if;
+  end if;
+
+  select max_amount into v_override
+  from public.investment_member_caps
+  where center_id = r.center_id and member_id = r.member_id;
+  if v_override is not null then v_member_cap := v_override; end if;
+
+  if coalesce(v_member_cap, 0) > 0 then
+    select coalesce(sum(case when it.type = 'deposit' then it.amount
+                             when it.type = 'withdrawal' then -it.amount
+                             else 0 end), 0)
+      into v_member_invested
+    from public.investments i
+    join public.investment_transactions it on it.investment_id = i.id
+    where i.member_id = r.member_id and i.center_id = r.center_id;
+    if v_member_invested + r.amount > v_member_cap then
+      raise exception 'Per-member limit reached: holds % of % limit.', v_member_invested, v_member_cap;
+    end if;
+  end if;
+
+  select coalesce(sum(case when type = 'credit' then amount else -amount end), 0)
+    into v_balance
+  from public.transactions where member_id = r.member_id;
+  if v_balance < r.amount then raise exception 'Member has insufficient wallet balance ($%)', v_balance; end if;
+
+  insert into public.transactions(member_id, type, amount, description, created_by, source, reference_id)
+  values (r.member_id, 'debit', r.amount, 'Investment deposit', auth.uid(), 'investment', r.center_id);
+
+  select id into v_investment_id from public.investments
+    where member_id = r.member_id and center_id = r.center_id;
+  if v_investment_id is null then
+    insert into public.investments(member_id, center_id) values (r.member_id, r.center_id)
+      returning id into v_investment_id;
+  else
+    update public.investments set status = 'active' where id = v_investment_id;
+  end if;
+
+  insert into public.investment_transactions(investment_id, type, amount, description, created_by)
+  values (v_investment_id, 'deposit', r.amount, 'Deposit', auth.uid());
+
+  update public.investment_join_requests
+    set status = 'approved', reviewed_by = auth.uid(), reviewed_at = now()
+    where id = p_request_id;
+end;
+$$;
+grant execute on function public.approve_investment_join(uuid) to authenticated;
+
+
+-- ============================================================
+-- 14. REVOKE MEMBER (global investment exit + disbursement record)
+-- ============================================================
+alter table public.investment_removals
+  add column if not exists disbursement_note text,
+  add column if not exists proof_url text;
+
+drop function if exists public.revoke_member(uuid, text, text);
+drop function if exists public.revoke_member(uuid, text, text, text, text);
+create or replace function public.revoke_member(
+  p_member_id uuid, p_mode text, p_reason text,
+  p_disbursement_note text default null, p_proof_url text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  inv record;
+  v_balance numeric;
+  v_capital numeric;
+  v_return numeric;
+  v_forfeit numeric;
+  v_removal_tx uuid;
+  v_wallet_tx uuid;
+  v_note text;
+begin
+  if not public.is_admin() then raise exception 'Not authorized'; end if;
+  if p_mode not in ('all', 'capital') then raise exception 'Invalid mode'; end if;
+  if coalesce(btrim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+  v_note := nullif(btrim(coalesce(p_disbursement_note, '')), '');
+
+  for inv in
+    select i.id, i.member_id, i.center_id
+    from public.investments i
+    where i.member_id = p_member_id and i.status = 'active'
+  loop
+    select coalesce(sum(case when type in ('deposit','profit') then amount
+                             when type in ('withdrawal','reversal') then -amount else 0 end), 0)
+      into v_balance from public.investment_transactions where investment_id = inv.id;
+    select coalesce(sum(case when type = 'deposit' then amount
+                             when type = 'withdrawal' then -amount else 0 end), 0)
+      into v_capital from public.investment_transactions where investment_id = inv.id;
+    if v_balance < 0 then v_balance := 0; end if;
+    if v_capital < 0 then v_capital := 0; end if;
+    if p_mode = 'all' then v_return := v_balance; else v_return := least(v_capital, v_balance); end if;
+    v_forfeit := v_balance - v_return;
+    v_removal_tx := null; v_wallet_tx := null;
+
+    if v_balance > 0 then
+      insert into public.investment_transactions(investment_id, type, amount, description, created_by)
+      values (inv.id, 'withdrawal', v_balance, 'Account revoked (' || p_mode || '): ' || p_reason, auth.uid())
+      returning id into v_removal_tx;
+    end if;
+    if v_return > 0 then
+      insert into public.transactions(member_id, type, amount, description, created_by, source, reference_id)
+      values (inv.member_id, 'credit', v_return, 'Returned on account revocation', auth.uid(), 'investment', inv.id)
+      returning id into v_wallet_tx;
+    end if;
+
+    update public.investments set status = 'closed' where id = inv.id;
+    insert into public.investment_removals(
+      investment_id, member_id, center_id, mode, returned_amount, forfeited_amount, reason,
+      removal_tx_id, wallet_tx_id, removed_by, disbursement_note, proof_url)
+    values (inv.id, inv.member_id, inv.center_id, p_mode, v_return, v_forfeit,
+            'Account revoked: ' || p_reason, v_removal_tx, v_wallet_tx, auth.uid(), v_note, p_proof_url);
+  end loop;
+
+  update public.profiles set status = 'rejected' where id = p_member_id;
+end;
+$$;
+grant execute on function public.revoke_member(uuid, text, text, text, text) to authenticated;
+
+
+-- ============================================================
+-- 15. MANUAL BALANCE ADJUSTMENT + FLEXIBLE LOCK-IN
+-- ============================================================
+-- 15a. Admin manual wallet credit/debit (audited; debit cannot overdraw)
+create or replace function public.admin_adjust_balance(
+  p_member_id uuid, p_direction text, p_amount numeric, p_reason text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_balance numeric;
+begin
+  if not public.is_admin() then raise exception 'Not authorized'; end if;
+  if p_direction not in ('credit', 'debit') then raise exception 'Invalid direction'; end if;
+  if p_amount is null or p_amount <= 0 then raise exception 'Amount must be greater than zero'; end if;
+  if coalesce(btrim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+
+  if p_direction = 'debit' then
+    select coalesce(sum(case when type = 'credit' then amount else -amount end), 0)
+      into v_balance from public.transactions where member_id = p_member_id;
+    if p_amount > v_balance then
+      raise exception 'Cannot debit %; it exceeds the available balance of %', p_amount, v_balance;
+    end if;
+  end if;
+
+  insert into public.transactions(member_id, type, amount, description, created_by, source)
+  values (p_member_id, p_direction, p_amount, 'Manual adjustment: ' || btrim(p_reason), auth.uid(), 'manual');
+end;
+$$;
+grant execute on function public.admin_adjust_balance(uuid, text, numeric, text) to authenticated;
+
+-- 15b. Flexible lock-in columns
+alter table public.investment_centers
+  add column if not exists lock_in_days int not null default 0,
+  add column if not exists lock_in_until date;
+
+-- 15c. Server-side lock enforcement honours months + days + fixed end date.
+--      (Re-created LAST so this definition wins over earlier ones.)
+create or replace function public.investment_locked_until(p_investment_id uuid)
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+           when c.lock_in_until is not null then
+             (c.lock_in_until + interval '1 day' - interval '1 second')
+           when coalesce(c.lock_in_months, 0) > 0 or coalesce(c.lock_in_days, 0) > 0 then
+             (select min(it.created_at)
+                from public.investment_transactions it
+               where it.investment_id = i.id and it.type = 'deposit')
+             + (coalesce(c.lock_in_months, 0) || ' months')::interval
+             + (coalesce(c.lock_in_days, 0) || ' days')::interval
+           else null
+         end
+  from public.investments i
+  join public.investment_centers c on c.id = i.center_id
+  where i.id = p_investment_id;
+$$;
+grant execute on function public.investment_locked_until(uuid) to authenticated;
+
+
+-- ============================================================
 -- DONE.
 -- Next: create the admin account.
 --   1. Register the admin via the app (or Dashboard → Auth → Add user, Auto Confirm).
