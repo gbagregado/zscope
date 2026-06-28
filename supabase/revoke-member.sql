@@ -1,5 +1,5 @@
 -- ============================================================
--- ZScope — REVOKE MEMBER (global investment exit)
+-- ZScope — REVOKE MEMBER (global investment exit + disbursement record)
 -- Run in Supabase Dashboard → SQL Editor on the EXISTING project.
 --
 -- When an admin revokes a member's access, every ACTIVE investment the
@@ -9,10 +9,26 @@
 --   * mode 'capital' -> return capital only, forfeit profit
 -- Each closure is logged in investment_removals (so it stays auditable
 -- and can be undone per-investment), then the profile is set to rejected.
+--
+-- The admin can also record WHERE the returned funds were actually sent
+-- (e.g. GCash / bank reference) and attach an optional proof screenshot.
 -- ============================================================
 
+-- record the real-world disbursement on the audit rows
+alter table public.investment_removals
+  add column if not exists disbursement_note text,
+  add column if not exists proof_url text;
+
+-- drop older signatures so we can change the parameter list cleanly
+drop function if exists public.revoke_member(uuid, text, text);
+drop function if exists public.revoke_member(uuid, text, text, text, text);
+
 create or replace function public.revoke_member(
-  p_member_id uuid, p_mode text, p_reason text)
+  p_member_id uuid,
+  p_mode text,
+  p_reason text,
+  p_disbursement_note text default null,
+  p_proof_url text default null)
 returns void
 language plpgsql
 security definer
@@ -26,10 +42,13 @@ declare
   v_forfeit numeric;
   v_removal_tx uuid;
   v_wallet_tx uuid;
+  v_note text;
 begin
   if not public.is_admin() then raise exception 'Not authorized'; end if;
   if p_mode not in ('all', 'capital') then raise exception 'Invalid mode'; end if;
   if coalesce(btrim(p_reason), '') = '' then raise exception 'A reason is required'; end if;
+
+  v_note := nullif(btrim(coalesce(p_disbursement_note, '')), '');
 
   for inv in
     select i.id, i.member_id, i.center_id
@@ -81,12 +100,13 @@ begin
 
     insert into public.investment_removals(
       investment_id, member_id, center_id, mode, returned_amount, forfeited_amount, reason,
-      removal_tx_id, wallet_tx_id, removed_by)
+      removal_tx_id, wallet_tx_id, removed_by, disbursement_note, proof_url)
     values (inv.id, inv.member_id, inv.center_id, p_mode, v_return, v_forfeit,
-            'Account revoked: ' || p_reason, v_removal_tx, v_wallet_tx, auth.uid());
+            'Account revoked: ' || p_reason, v_removal_tx, v_wallet_tx, auth.uid(),
+            v_note, p_proof_url);
   end loop;
 
   update public.profiles set status = 'rejected' where id = p_member_id;
 end;
 $$;
-grant execute on function public.revoke_member(uuid, text, text) to authenticated;
+grant execute on function public.revoke_member(uuid, text, text, text, text) to authenticated;

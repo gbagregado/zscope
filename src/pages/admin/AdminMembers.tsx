@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { CheckCircle, XCircle, Clock, Users, UserMinus, AlertTriangle, X } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Users, UserMinus, AlertTriangle, X, Paperclip } from 'lucide-react'
 import clsx from 'clsx'
 
 type Member = { id: string; full_name: string; email: string; role: string; status: 'pending' | 'active' | 'rejected' }
@@ -14,6 +14,8 @@ export default function AdminMembers() {
   const [revokeMode, setRevokeMode] = useState<'all' | 'capital'>('all')
   const [revokeReason, setRevokeReason] = useState('')
   const [revokeError, setRevokeError] = useState<string | null>(null)
+  const [disbursementNote, setDisbursementNote] = useState('')
+  const [proofFile, setProofFile] = useState<File | null>(null)
 
   const { data: members, isLoading } = useQuery({
     queryKey: ['admin-members'],
@@ -52,14 +54,25 @@ export default function AdminMembers() {
 
   const revokeMember = useMutation({
     mutationFn: async ({ memberId, mode, reason }: { memberId: string; mode: 'all' | 'capital'; reason: string }) => {
+      let proof_url: string | null = null
+      if (proofFile) {
+        const ext = proofFile.name.split('.').pop()
+        const path = `revocations/${memberId}-${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage.from('payment-proofs').upload(path, proofFile, { upsert: true })
+        if (upErr) throw upErr
+        const { data: urlData } = await supabase.storage.from('payment-proofs').createSignedUrl(path, 60 * 60 * 24 * 365)
+        proof_url = urlData?.signedUrl ?? null
+      }
       const { error } = await supabase.rpc('revoke_member', {
         p_member_id: memberId, p_mode: mode, p_reason: reason,
+        p_disbursement_note: disbursementNote.trim() || null, p_proof_url: proof_url,
       })
       if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-members'] })
       setRevokeTarget(null); setRevokeReason(''); setRevokeError(null)
+      setDisbursementNote(''); setProofFile(null)
     },
     onError: (e: unknown) => setRevokeError(e instanceof Error ? e.message : 'Failed to revoke member'),
   })
@@ -69,6 +82,8 @@ export default function AdminMembers() {
     setRevokeMode('all')
     setRevokeReason('')
     setRevokeError(null)
+    setDisbursementNote('')
+    setProofFile(null)
   }
 
   const revokeCalc = (() => {
@@ -255,6 +270,22 @@ export default function AdminMembers() {
             <div className="mt-4">
               <label className="text-xs font-medium text-gray-400">Reason (required, kept for audit)</label>
               <textarea value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} rows={2} placeholder="e.g. Policy violation / member request" className="mt-1 w-full resize-none rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+            </div>
+
+            {/* disbursement record (optional) */}
+            <div className="mt-3">
+              <label className="text-xs font-medium text-gray-400">Where were the funds sent? <span className="text-gray-600">(optional)</span></label>
+              <input value={disbursementNote} onChange={(e) => setDisbursementNote(e.target.value)} placeholder="e.g. GCash 0917••• / BPI ref 12345" className="mt-1 w-full rounded-lg border border-gray-700 bg-[#0f0f0f] px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:border-violet-500 focus:outline-none" />
+            </div>
+            <div className="mt-2">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-700 px-3 py-2 text-xs text-gray-400 hover:border-violet-500/40 hover:text-gray-200 transition">
+                <Paperclip size={14} />
+                {proofFile ? <span className="truncate text-gray-200">{proofFile.name}</span> : <span>Attach proof of transfer (optional)</span>}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => setProofFile(e.target.files?.[0] ?? null)} />
+              </label>
+              {proofFile && (
+                <button onClick={() => setProofFile(null)} className="mt-1 text-[11px] text-gray-500 hover:text-red-400">Remove attachment</button>
+              )}
             </div>
 
             {revokeError && <p className="mt-2 flex items-center gap-1 text-xs text-red-400"><AlertTriangle size={12} /> {revokeError}</p>}

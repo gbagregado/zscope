@@ -310,6 +310,8 @@ export interface Database {
           removed_by: string | null
           reverted_at: string | null
           reverted_by: string | null
+          disbursement_note: string | null
+          proof_url: string | null
           created_at: string
         }
         Insert: {
@@ -325,6 +327,8 @@ export interface Database {
           removed_by?: string | null
           reverted_at?: string | null
           reverted_by?: string | null
+          disbursement_note?: string | null
+          proof_url?: string | null
         }
         Update: Partial<Database['public']['Tables']['investment_removals']['Insert']>
         Relationships: []
@@ -395,7 +399,7 @@ export interface Database {
         Returns: undefined
       }
       revoke_member: {
-        Args: { p_member_id: string; p_mode: string; p_reason: string }
+        Args: { p_member_id: string; p_mode: string; p_reason: string; p_disbursement_note?: string | null; p_proof_url?: string | null }
         Returns: undefined
       }
     }

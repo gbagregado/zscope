@@ -152,7 +152,7 @@ export default function AdminInvestments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('investment_removals')
-        .select('id, member_id, mode, returned_amount, forfeited_amount, reason, reverted_at, created_at')
+        .select('id, member_id, mode, returned_amount, forfeited_amount, reason, reverted_at, created_at, disbursement_note, proof_url')
         .eq('center_id', selectedCenterId!)
         .order('created_at', { ascending: false })
         .limit(10)
@@ -828,6 +828,12 @@ export default function AdminInvestments() {
                     {' · '}{fmtDate(r.created_at)}
                   </p>
                   <p className="truncate text-[11px] text-gray-700">“{r.reason}”</p>
+                  {(r.disbursement_note || r.proof_url) && (
+                    <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-gray-600">
+                      {r.disbursement_note && <span>Sent to: <span className="text-gray-400">{r.disbursement_note}</span></span>}
+                      {r.proof_url && <a href={r.proof_url} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300">View proof</a>}
+                    </p>
+                  )}
                 </div>
                 {!r.reverted_at && (
                   <button onClick={() => doUndoRemoval(r)} disabled={undoRemoval.isPending} title="Undo this removal" className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-700 px-2 py-1 text-[11px] text-gray-400 hover:border-violet-500/40 hover:text-violet-300 disabled:opacity-50 transition">
