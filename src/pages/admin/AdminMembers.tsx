@@ -332,12 +332,6 @@ export default function AdminMembers() {
                     ? <span className="break-all font-medium text-gray-200">{revokeTarget.wallet_address}</span>
                     : <span className="text-gray-500 italic">not provided</span>}
                 </div>
-                <div>
-                  <span className="text-gray-500">Address: </span>
-                  {revokeTarget.address
-                    ? <span className="text-gray-300">{revokeTarget.address}</span>
-                    : <span className="text-gray-500 italic">not provided</span>}
-                </div>
               </div>
               {revokeTarget.wallet_address && (
                 <button onClick={() => setDisbursementNote(`${revokeTarget.payout_network ? revokeTarget.payout_network + ': ' : ''}${revokeTarget.wallet_address}`)} className="mt-2 text-[11px] text-violet-400 hover:text-violet-300">Use wallet address as disbursement note</button>

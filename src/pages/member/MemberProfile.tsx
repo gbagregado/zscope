@@ -4,10 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { CheckCircle, AlertCircle, MapPin, Wallet } from 'lucide-react'
+import { CheckCircle, AlertCircle, Wallet } from 'lucide-react'
 
 const schema = z.object({
-  address: z.string().min(5, 'Please enter your full address'),
   payout_network: z.string().min(1, 'Please select a network'),
   wallet_address: z.string().min(20, 'Wallet address looks too short').max(120, 'Wallet address looks too long'),
 })
@@ -25,7 +24,6 @@ export default function MemberProfile() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      address: profile?.address ?? '',
       payout_network: profile?.payout_network ?? '',
       wallet_address: profile?.wallet_address ?? '',
     },
@@ -35,7 +33,7 @@ export default function MemberProfile() {
     setError('')
     setSaved(false)
     const { error: rpcError } = await supabase.rpc('update_my_account_info', {
-      p_address: data.address,
+      p_address: profile?.address ?? '',
       p_payout_network: data.payout_network,
       p_wallet_address: data.wallet_address,
     })
@@ -49,7 +47,7 @@ export default function MemberProfile() {
     <div className="mx-auto max-w-lg space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-gray-100">Payout details</h2>
-        <p className="mt-1 text-sm text-gray-500">Keep your address and main Solana account up to date so we always know where to send your funds.</p>
+        <p className="mt-1 text-sm text-gray-500">Keep your payout network and wallet account up to date so we always know where to send your funds.</p>
       </div>
 
       {/* Read-only identity */}
@@ -79,12 +77,6 @@ export default function MemberProfile() {
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 rounded-xl border border-white/6 bg-[#141414] p-5">
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300"><MapPin size={14} className="text-gray-500" /> Address</label>
-          <input {...register('address')} type="text" autoComplete="street-address" className={inputClass} placeholder="House no., street, city, province" />
-          {errors.address && <p className="text-xs text-red-400">{errors.address.message}</p>}
-        </div>
-
         <div className="flex flex-col gap-2">
           <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300"><Wallet size={14} className="text-gray-500" /> Payout network / chain</label>
           <select {...register('payout_network')} className={inputClass}>
