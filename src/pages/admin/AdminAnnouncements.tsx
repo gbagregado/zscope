@@ -50,8 +50,7 @@ export default function AdminAnnouncements() {
 
   const update = useMutation({
     mutationFn: async ({ id, oldStoragePath, image_url, storage_path, ...data }: FormData & { id: string; oldStoragePath: string | null; image_url?: string | null; storage_path?: string | null }) => {
-      const patch: Record<string, unknown> = { ...data }
-      if (image_url !== undefined) { patch.image_url = image_url; patch.storage_path = storage_path }
+      const patch = image_url !== undefined ? { ...data, image_url, storage_path } : { ...data }
       const { error } = await supabase.from('announcements').update(patch).eq('id', id)
       if (error) throw error
       if (image_url !== undefined && oldStoragePath) {
