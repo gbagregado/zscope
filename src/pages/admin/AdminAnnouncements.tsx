@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { useConfirm } from '../../components/ConfirmDialog'
-import { Plus, Trash2, Upload, Image as ImageIcon, Pencil, X } from 'lucide-react'
+import { Plus, Trash2, Upload, Image as ImageIcon, Pencil, X, Monitor } from 'lucide-react'
 
 const schema = z.object({
   title: z.string().min(1, 'Required'),
@@ -76,6 +76,15 @@ export default function AdminAnnouncements() {
     reset({ title: a.title, body: a.body, show_as_popup: a.show_as_popup })
     setShowForm(true)
   }
+
+  const togglePopup = useMutation({
+    mutationFn: async ({ id, show_as_popup }: { id: string; show_as_popup: boolean }) => {
+      const { error } = await supabase.from('announcements').update({ show_as_popup }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['announcements'] }),
+    onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Failed to update announcement'),
+  })
 
   const del = useMutation({
     mutationFn: async (item: { id: string; storage_path: string | null }) => {
@@ -192,6 +201,13 @@ export default function AdminAnnouncements() {
                 <p className="mt-2 text-xs text-gray-600">{new Date(a.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
               </div>
               <div className="flex flex-shrink-0 items-center gap-1">
+                <button
+                  onClick={() => togglePopup.mutate({ id: a.id, show_as_popup: !a.show_as_popup })}
+                  className={a.show_as_popup ? 'rounded-md p-1.5 text-violet-400 hover:bg-white/5' : 'rounded-md p-1.5 text-gray-600 hover:bg-white/5 hover:text-gray-300'}
+                  title={a.show_as_popup ? 'Stop showing as login pop-up' : 'Show as login pop-up'}
+                >
+                  <Monitor size={16} />
+                </button>
                 <button
                   onClick={() => openEdit(a)}
                   className="text-gray-600 hover:text-violet-400 transition-colors"
